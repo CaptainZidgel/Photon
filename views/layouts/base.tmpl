@@ -1,0 +1,33 @@
+<html>
+<body>
+<div id="header">
+	{{if .myUser}}
+	<span id="self-ref">Hi, <a href="/profiles/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
+	<span id="logio"><a href="/logout">Logout</a></span>
+	{{else}}
+	<span id="logio"><a href="/login">Login</a></span>
+	{{end}}
+</div>
+{{template "content" . }}
+</body>
+<style>
+	body {
+		margin: 0px;
+	}
+	#header {
+		background-color: gray;
+		width: 100%;
+		overflow: hidden;
+	}
+	#logio {
+		float: right;
+	}
+	#self-ref {
+		float: right;
+	}
+	a {
+		color: white;
+		text-decoration: none;
+	}
+</style>
+</html>
