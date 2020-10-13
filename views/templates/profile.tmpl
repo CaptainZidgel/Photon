@@ -2,6 +2,20 @@
 {{define "content"}}
 <head><title>{{.User.Username}}</title></head>
 <script type="text/javascript">
+{{if .SameUser}}
+	function toggleAvatarForm() {
+		let p = document.getElementById("pfp-form-container");
+		if (p.style.display === "none") {
+			p.style.display = "block";
+		} else {
+			p.style.display = "none";
+		}
+	}
+
+	let pfp = document.getElementById("pfp");
+	let pfpformc = document.getElementById("pfp-form-container");
+{{end}}
+
 function toggleModal(m) {
 	slides(m, 0);
 	if (document.getElementById("lbox-"+m).style.display === "none") {
@@ -13,7 +27,7 @@ function toggleModal(m) {
 
 function slides(gallery, slide) {
 	let i;
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`photo`)
+	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`)
 	if (slide < 0) {
 		slide = x.length - 1;
 	} else if (slide > x.length - 1) {
@@ -28,29 +42,47 @@ function slides(gallery, slide) {
 window.onclick = function(event) {
 	let cname = event.target.className;
 	let id = event.target.id;
-	console.log(cname, id);
-	if (cname == "lbox") {
-		console.log("Clicked lbox", cname, id);
+	if (cname == "lbox" && id != "pfp-form-container") {
 		let n = id.match(/lbox-(\d+)/)[1];
-		console.log("Found", n);
 		toggleModal(n);
 	}
+	{{if .SameUser}}
+	if (id == "pfp") {
+		toggleAvatarForm();
+	}
+	if (id == "pfp-form-container") {
+		toggleAvatarForm();
+	}
+	{{end}}
 }
 
 function changeSlide(gallery, direction) {
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`photo`)
+	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`);
 	for (let i = 0; i < x.length; i++) {
 		if (x[i].style.display != "none") {
-			slides(gallery, i + direction)
-			return
+			slides(gallery, i + direction);
+			return;
 		}
 	}
 }
 </script>
 
 <div id="body">
+
+	{{if .SameUser}}
+	<div id="pfp-form-container" class="lbox" style="display: none;"> <!--I don't know if reusing lbox here is a good idea but I'm doing it anyway-->
+		<form id="pfp-form" action="/update_avatar" method="post" style="width: 600px; height: 200px; background-color: white;display: inline-block;">
+			<label for="new-pfp-url">URL</label><input type="text" name="url" id="new-pfp-url">
+			<input type="submit">
+		</form>
+	</div>
+	{{end}}
+
 	<div id="user-info">
-		<img width="250" height="250" src="{{.User.Avatar}}">
+		<img width="250" height="250" src="{{.User.Avatar}}" id="pfp">
+		{{if .SameUser}}
+		<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
+		{{end}}
 		<strong>{{.User.Displayname}}</strong><br>
 		@{{.User.Username}}
 	</div>
@@ -63,12 +95,29 @@ function changeSlide(gallery, direction) {
 				</div>
 
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
-					<span onclick="toggleModal({{$gi}})">X</span>
-					<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div>
+					<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div><div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
 					{{range $pi, $p := $g.Photos}}
-						<img src="{{$p.Reference}}" class="photo" id="gal-{{$gi}}-photo">
+						<span class="slide" id="slide-{{$gi}}:{{$pi}}">
+							<table class="infobox">
+								{{range $k, $v := $p.Exif}}
+								<tr>
+									<td>{{$k}}</td>
+									<td>{{$v}}<td>
+								</tr>
+								{{end}}
+							</table>
+							<img src="{{$p.Reference}}" class="photo">
+						</span>
 					{{end}}
-					<div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
+					
+					<div class="infobox gal-info">
+						<span class="description">
+						{{$g.Description}}
+						</span>
+						<span class="gallery-upload-stamp">
+						{{$g.Uploaded}}
+						</span>
+					</div>
 				</div>
 			{{end}}
 		{{end}}
@@ -108,16 +157,16 @@ function changeSlide(gallery, direction) {
 }
 
 .lbox img {
-  margin-top: 5%;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .prev, .next {
 	color: white;
-	display: inline-block;
-	position: sticky;
-	top: -50%;
-	position: relative;
+	display: inline;
 	background-color: black;
+	margin-top: 25%;
 }
 
 #img-grid {
@@ -139,6 +188,12 @@ function changeSlide(gallery, direction) {
 	width: 60rem;
 }
 
+.infobox {
+	background-color: gray;
+	display: inline-block;
+	width: 500px;
+	margin: 0px;
+}
 </style>
 
 {{end}}

@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
-	"strconv"
+	_"strconv"
 	_"time"
 )
 
 //Set, Lua style
-var ExifTags = map[string]bool{
-	"DateTimeOriginal": true,
-	"LensModel": true,
-	"Model": true,
-	"ISOSpeedRatings": true,
-	"FNumber": true,	//this is a string of 'x/y', needs to be  F{x div y}	
+var ExifTags = map[string]string{
+	"DateTimeOriginal": "Date Taken",
+	"LensModel": "Lens",
+	"Model": "Model",
+	"ISOSpeedRatings": "ISO",
+	"FNumber": "F-Stop",	//this is a string of 'x/y', needs to be  F{x div y}	
 }
 
 func ParseExif(file string) (output map[string]string, err error) {
@@ -42,11 +42,11 @@ func ParseExif(file string) (output map[string]string, err error) {
 	}
 
 	final := make(map[string]string)
-	for key, _ := range ExifTags {
+	for key, newkey := range ExifTags {
 		if value, exists := result[key]; exists {
-			final[key] = value
+			final[newkey] = value
 		} else {
-			final[key] = ""
+			final[newkey] = ""
 		}
 	}
 
@@ -69,15 +69,40 @@ func loadBlob(dir string) {
 	}
 }
 
+type Exif map[string]string
+
+func ExifFromDB(db *sql.DB, id int) Exif {
+	var exif Exif
+	row := db.QueryRow("SELECT datetaken, fstop, iso, model, lens FROM photos WHERE user_id = ?", id)
+	err := row.Scan(exif["Date Taken"], exif["F-Stop"], exif["ISO"], exif["Model"], exif["Lens"])
+	if err != nil {
+		panic(err)
+	}
+	return exif
+}
+
+func ExifFromStruct(p Photo) Exif {
+	exif := make(Exif)
+	exif["Date Taken"] = p.Datetaken
+	exif["F-Stop"] = p.Fstop
+	exif["ISO"] = p.ISO
+	exif["Model"] = p.Model
+	exif["Lens"] = p.Lens
+	return exif
+}
+
 type Photo struct {
 	Id int64
 	Reference string
 	Gallery_id int
+	
 	Datetaken string
-	Fstop float64
-	ISO int
+	Fstop string
+	ISO string
 	Model string
 	Lens string
+	
+	Exif Exif
 }
 
 type Gallery struct {
@@ -93,6 +118,11 @@ func InsertPhotoIntoDatabase(db *sql.DB, photo Photo) int64 {
 	r, e := db.Exec("INSERT INTO photos(ref, gallery_id, datetaken, fstop, iso, model, lens) VALUES(?, ?, ?, ?, ?, ?, ?)",
 					photo.Reference,
 					photo.Gallery_id,
+					/*photo.Exif["Date Taken"],
+					photo.Exif["F-Stop"],
+					photo.Exif["ISO"],
+					photo.Exif["Model"],
+					photo.Exif["Lens"],*/
 					photo.Datetaken,
 					photo.Fstop,
 					photo.ISO,
@@ -137,10 +167,11 @@ func NewGallery(db *sql.DB, owner int, date string, desc string) *Gallery {
 }
 
 //the exif map is all string, but my Photo struct/SQL table is typed. Probably because I have no foresight. Nonetheless!
-func NewPhoto(db *sql.DB, reference string, gallery int, exifmap map[string]string) *Photo {
-	iso, _ := strconv.Atoi(exifmap["ISOSpeedRatings"])
+func NewPhoto(db *sql.DB, reference string, gallery int, exifmap Exif) *Photo {
+	/*
+	iso, _ := strconv.Atoi(exifmap["ISO"])
 	var Fstop float64
-	if exifmap["FNumber"] == "" {
+	if exifmap["F-Stop"] == "" {
 		Fstop = -0.0
 	} else {
 		Fn := strings.Split(exifmap["FNumber"], "/")
@@ -149,15 +180,17 @@ func NewPhoto(db *sql.DB, reference string, gallery int, exifmap map[string]stri
 		Fn2, _ := strconv.Atoi(Fn[1])
 		Fstop = 	float64(Fn1) / float64(Fn2)
 	}
-	datetaken := exifmap["DateTimeOriginal"]
+	
+	datetaken := exifmap["Date Taken"]
+	*/
 
-	photo := Photo{-102, reference, gallery, datetaken, Fstop, iso, exifmap["Model"], exifmap["Lens"]}
+	photo := Photo{-102, reference, gallery, exifmap["Date Taken"], exifmap["F-Stop"], exifmap["ISO"], exifmap["Model"], exifmap["Lens"], exifmap}
 	id := InsertPhotoIntoDatabase(db, photo)
 	photo.Id = id
 	return &photo
 }
 
-func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) {
+func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) {	//("SELECT * FROM photos WHERE gallery_id = ?")
 	rows, err := stmt.Query(gallery.Id)
 	if err != nil {
 		panic(err)
@@ -170,6 +203,7 @@ func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) {
 		if err := rows.Scan(&photo.Reference, &photo.Id, &photo.Gallery_id, &photo.Datetaken, &photo.Fstop, &photo.ISO, &photo.Model, &photo.Lens); err != nil {
 			panic(err)
 		}
+		photo.Exif = ExifFromStruct(photo)
 		photos = append(photos, photo)
 	}
 	gallery.Photos = photos

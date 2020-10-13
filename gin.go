@@ -91,7 +91,7 @@ func main() {
 
 	rout.GET("/", func(c *gin.Context) {
 		myUser, _ := c.Get("myUser")
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "usr": myUser})
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "myUser": myUser})
 	})
 	
 	rout.GET("/register", func(c *gin.Context) {
@@ -220,14 +220,30 @@ func main() {
 			photos = append(photos, photo)
 		}
 		*/
-		c.HTML(200, "profile.tmpl", gin.H{"User": user, "Galleries": gals, "myUser": myUser})
+
+		var SameUser bool
+		if myUser.(User).id == user.id {
+			SameUser = true
+		} else {
+			SameUser = false
+		}
+		fmt.Println("Same user:", SameUser)
+		c.HTML(200, "profile.tmpl", gin.H{"User": user, "Galleries": gals, "myUser": myUser, "SameUser": SameUser})
 	})
 
 	rout.GET("/other/:o", func(c *gin.Context) {
 		o := c.Param("o")
 		c.String(200, nfkd(o))
 	})
-
+    /*
+	rout.POST("/update_avatar", func(c *gin.Context) {
+		url := c.PostForm("url")
+		myUser, _ := c.Get("myUser")
+		if myUser != nil {//crunge
+		    //unimplemented
+		}
+	})
+    */
 	rout.Run()
 }
 
