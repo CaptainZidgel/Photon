@@ -10,7 +10,11 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_"strconv"
 	_"time"
+	"image"
+	"golang.org/x/image/draw"
 )
+
+type Exif map[string]string
 
 //Set, Lua style
 var ExifTags = map[string]string{
@@ -21,8 +25,9 @@ var ExifTags = map[string]string{
 	"FNumber": "F-Stop",	//this is a string of 'x/y', needs to be  F{x div y}	
 }
 
-func ParseExif(file string) (output map[string]string, err error) {
-	result := make(map[string]string)
+//Take a file, open it, return the exif dictionary
+func ParseExif(file string) (output Exif, err error) {
+	result := make(Exif)
 
 	bytes, err := exif.SearchFileAndExtractExif(file) //exif.SearchAndExtractExifWithReader(*os.File)
 	if err != nil { 
@@ -41,7 +46,7 @@ func ParseExif(file string) (output map[string]string, err error) {
 		}
 	}
 
-	final := make(map[string]string)
+	final := make(Exif)
 	for key, newkey := range ExifTags {
 		if value, exists := result[key]; exists {
 			final[newkey] = value
@@ -68,8 +73,6 @@ func loadBlob(dir string) {
 			}
 	}
 }
-
-type Exif map[string]string
 
 func ExifFromDB(db *sql.DB, id int) Exif {
 	var exif Exif
@@ -211,6 +214,15 @@ func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) {	//("SELECT * FROM photo
 		gallery.Thumb = photos[0].Reference
 	}
 }
+
+// https://github.com/nfnt/resize/issues/63#issuecomment-540704731
+// scaled := Scale(src, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image {
+	dst := image.NewRGBA(rect)
+	scale.Scale(dst, rect, src, src.Bounds(), draw.Over, nil)
+	return dst
+}
+
 
 /* I used this to fuzz my db with galleries and images
 func main() {

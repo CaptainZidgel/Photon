@@ -3,6 +3,9 @@ package main
 import (
 	"log"
 	"fmt"
+	"os"
+	"bufio"
+	_ "bytes"
 	"strings"
 	_"strconv"
 	"github.com/gin-gonic/gin"
@@ -16,6 +19,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"github.com/gin-contrib/multitemplate"
 	"path/filepath"
+	"image"
+	"image/jpeg"
+	_ "image/png"
+	"golang.org/x/image/draw"
+	_ "mime/multipart"
 )
 
 func AssembleDriverStr() string {
@@ -63,21 +71,31 @@ func main() {
 	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?)")
 	if err != nil { log.Fatal(err) }
 	defer sqlINSERTuser.Close()
-		sqlSELECTuserID, err := db.Prepare("SELECT * FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
-		if err != nil { log.Fatal(err) }
-		defer sqlSELECTuserID.Close()
-			sqlSELECTuserNAME, err := db.Prepare("SELECT user_id, username, displayname, avatar FROM users WHERE username = ?")
-			if err != nil { log.Fatal(err) }
-			defer sqlSELECTuserNAME.Close()
-				sqlSELECTuserPASS, err := db.Prepare("SELECT pass FROM users WHERE username = ?") //get pass for username
-				if err != nil { log.Fatal(err) }
-				defer sqlSELECTuserPASS.Close()
-					sqlSELECTphotos, err := db.Prepare("SELECT * FROM photos WHERE gallery_id = ?")
-					if err != nil { log.Fatal(err) }
-					defer sqlSELECTphotos.Close()
-						sqlSELECTgals, err := db.Prepare("SELECT gallery_id, thumb, description, uploaded FROM galleries WHERE owner_id = ?")
-						if err != nil { log.Fatal(err) }
-						defer sqlSELECTgals.Close()
+	
+	sqlSELECTuserID, err := db.Prepare("SELECT * FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
+	if err != nil { log.Fatal(err) }
+	defer sqlSELECTuserID.Close()
+	
+	sqlSELECTuserNAME, err := db.Prepare("SELECT user_id, username, displayname, avatar FROM users WHERE username = ?")
+	if err != nil { log.Fatal(err) }
+	defer sqlSELECTuserNAME.Close()
+			
+	sqlSELECTuserPASS, err := db.Prepare("SELECT pass FROM users WHERE username = ?") //get pass for username
+	if err != nil { log.Fatal(err) }
+	defer sqlSELECTuserPASS.Close()
+				
+	sqlSELECTphotos, err := db.Prepare("SELECT * FROM photos WHERE gallery_id = ?")
+	if err != nil { log.Fatal(err) }
+	defer sqlSELECTphotos.Close()
+					
+	sqlSELECTgals, err := db.Prepare("SELECT gallery_id, thumb, description, uploaded FROM galleries WHERE owner_id = ?")
+	if err != nil { log.Fatal(err) }
+	defer sqlSELECTgals.Close()
+	
+	sqlUPDATEuserPASS, err := db.Prepare("UPDATE users SET pass = ? WHERE username = ?") //replace the password hash for this username : sqlUPDATEuserPASS.Exec(newhash, username)
+	if err != nil {log.Fatal(err) }
+	defer sqlUPDATEuserPASS.Close()
+	
 	/*																																																		*/
 
 	rout := gin.Default()
@@ -112,8 +130,10 @@ func main() {
 				passw := []byte(c.PostForm("password"))
 				hash, err := bcrypt.GenerateFromPassword(passw, Config.PassCost)
 				if err != nil { log.Panic(err) }
-				_, err2 := sqlINSERTuser.Exec(nil, username, display_name, hash)	//Exec does not return useful information related to the results of the query, therefore I only consider it appropriate for INSERT statements.
+				
+				_, err2 := sqlINSERTuser.Exec(nil, username, display_name, hash)	//Exec does not return useful information related to the results of the query, therefore it is only appropriate for INSERT & UPDATE statements.
 				if err2 != nil { log.Panic(err2) }
+				
 				c.Redirect(http.StatusSeeOther, "/")
 				c.Abort()
 			}
@@ -154,28 +174,53 @@ func main() {
 		c.Redirect(302, "/")
 		c.Abort()
 	})
+	
+	rout.POST("/update_password", func(c *gin.Context) {
+	    un := c.PostForm("username")
+	    pass := []byte(c.PostForm("password")) //new desired password
+	    
+	    hash, err := bcrypt.GenerateFromPassword(pass, Config.PassCost)
+		if err != nil { log.Panic(err) }
+		
+		_, err = sqlUPDATEuserPASS.Exec(hash, un)
+		if err != nil { log.Panic(err) }
+	    
+	})
 
 	rout.GET("/upload", func(c *gin.Context) {
 		//if registered
 		c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{})
 	})
 	rout.POST("/upload", func(c *gin.Context) {
-		photo, _ := c.FormFile("photo")
-		file, err := photo.Open()
+		photoheader, _ := c.FormFile("photo") //get the form parameter 'photo' (type: *multipart.FileHeader)
+		file, err := photoheader.Open() //get associated file for parameter (type: File)
+
 		if err != nil { 
 			c.String(500, "Error uploading file: " + err.Error()) 
 			c.Abort()
 		}
 		defer file.Close()
-		buff := make([]byte, 512) // https://stackoverflow.com/a/38175140/12514997
+		
+		buff := make([]byte, 512) //verify image is valid https://stackoverflow.com/a/38175140/12514997
 		_, err = file.Read(buff)
 		if err != nil { 
 			c.String(500, "Error reading file for validation: " + err.Error()) 
 			c.Abort()
 		}
+		file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
 		
 		if strings.HasPrefix(http.DetectContentType(buff), "image/") {
+		    rdr := bufio.NewReader(file)
 		
+		    uploaded, _, err := image.Decode(rdr)
+		    if err != nil {
+		        panic(err)
+		    }
+		    
+		    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+		    f, _ := os.Create("testrescale.jpg")
+		    defer f.Close()
+		    jpeg.Encode(f, thumb, nil)
 		} else {
 			c.String(415, "Unsupported file type") //415 -> Media type unsupported
 			c.Abort()
@@ -222,7 +267,7 @@ func main() {
 		*/
 
 		var SameUser bool
-		if myUser.(User).id == user.id {
+		if myUser != nil && myUser.(User).id == user.id {
 			SameUser = true
 		} else {
 			SameUser = false
