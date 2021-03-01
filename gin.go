@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"fmt"
-	"os"
+	_ "os"
 	"bufio"
 	_ "bytes"
 	"strings"
@@ -20,9 +20,9 @@ import (
 	"github.com/gin-contrib/multitemplate"
 	"path/filepath"
 	"image"
-	"image/jpeg"
+	_ "image/jpeg"
 	_ "image/png"
-	"golang.org/x/image/draw"
+	_ "golang.org/x/image/draw"
 	_ "mime/multipart"
 )
 
@@ -213,14 +213,31 @@ func main() {
 		    rdr := bufio.NewReader(file)
 		
 		    uploaded, _, err := image.Decode(rdr)
-		    if err != nil {
+		    if err != nil || uploaded == nil {
 		        panic(err)
 		    }
 		    
+		    file.Seek(0, 0)
+		    xif, err2 := ParseExif(file)
+		    fmt.Println("Err:", err2)
+		    if err2 != nil && err2.Error() != "no exif data" {
+		        log.Fatal(err)
+		    }
+		    fmt.Println("Time to print")
+		    for k, v := range xif {
+		        fmt.Println(k, v)
+		    }
+		    
+		    file.Seek(0, 0) //i could maybe make this a part of the function but then if I ever wanted to upload a file already at offset 0 I would lose fficiency :)
+		    EraseGPS(file)
+		    //UploadToCDN(file, "testywesty.jpeg")
+		   
+		    /*
 		    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
 		    f, _ := os.Create("testrescale.jpg")
 		    defer f.Close()
 		    jpeg.Encode(f, thumb, nil)
+		    */
 		} else {
 			c.String(415, "Unsupported file type") //415 -> Media type unsupported
 			c.Abort()

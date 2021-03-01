@@ -3,7 +3,9 @@ package main
 import (
 	"github.com/dsoprea/go-exif/v3"
 	"strings"
-	"io/ioutil"
+	"io"
+	"bytes"
+	_"io/ioutil"
 	_"os"
 	"fmt"
 	"database/sql"
@@ -12,6 +14,7 @@ import (
 	_"time"
 	"image"
 	"golang.org/x/image/draw"
+	"github.com/kolesa-team/goexiv"
 )
 
 type Exif map[string]string
@@ -25,11 +28,11 @@ var ExifTags = map[string]string{
 	"FNumber": "F-Stop",	//this is a string of 'x/y', needs to be  F{x div y}	
 }
 
-//Take a file, open it, return the exif dictionary
-func ParseExif(file string) (output Exif, err error) {
+//Take a file already opened, return the exif dictionary
+func ParseExif(file io.Reader) (output Exif, err error) {
 	result := make(Exif)
 
-	bytes, err := exif.SearchFileAndExtractExif(file) //exif.SearchAndExtractExifWithReader(*os.File)
+	bytes, err := exif.SearchAndExtractExifWithReader(file)
 	if err != nil { 
 		if err.Error() == "no exif data" {	//I couldn't compare err and exif.ErrNoExif for some reason
 			return nil, err//uninit, nil map
@@ -37,6 +40,7 @@ func ParseExif(file string) (output Exif, err error) {
 			panic(err)
 		} 
 	}
+	
 	fmt.Println("Found exif... searching...")
 	opt := exif.ScanOptions{}	//I'm basically copying this from https://github.com/photoprism/photoprism/blob/develop/internal/meta/exif.go
 	entries, _, err := exif.GetFlatExifData(bytes, &opt)
@@ -58,21 +62,45 @@ func ParseExif(file string) (output Exif, err error) {
 	return final, nil
 }
 
-//unexported, i use this for fuzzing
-func loadBlob(dir string) {
-	items, _ := ioutil.ReadDir(dir)
-    for _, item := range items {
-			if item.IsDir() {continue}
-			//f, _ := os.Open(item.Name())
-			fmt.Println("<>><><><><><><><><><>===========Parsing", item.Name())
-			dat, err := ParseExif(dir+"/"+item.Name())
-			if err == nil {
-				for k, v := range dat {
-					fmt.Println(k, v)
-				}
-			}
-	}
+func EraseGPS(file io.Reader) {
+    //reader to bytes
+    buf := new(bytes.Buffer)
+    _, er := buf.ReadFrom(file)
+    if er != nil {
+        panic(er)
+    }
+    
+    img, err := goexiv.OpenBytes(buf.Bytes())
+    img.ReadMetadata()
+    if err != nil {
+        panic(err)
+    }
+    
+    xif := img.GetExifData().AllTags()
+    for k, v := range xif {
+        fmt.Printf("%v %v\n", k, v)
+    }
+    
+    img.SetExifString("Exif.GPSInfo.0x001f", "")
+    img.SetExifString("Exif.GPSInfo.GPSLatitudeRef", "")
+    img.SetExifString("Exif.GPSInfo.GPSLatitude", "")
+    img.SetExifString("Exif.GPSInfo.GPSLongitude", "")
+    img.SetExifString("Exif.GPSInfo.GPSLongitudeRef", "")
+    img.SetExifString("Exif.GPSInfo.Altitude", "")
+    img.SetExifString("Exif.GPSInfo.DestBearing", "")
+    img.SetExifString("Exif.GPSInfo.Speed", "")
+    img.SetExifString("Exif.GPSInfo.ImgDirection", "")
+    
+    xif5 := img.GetExifData().AllTags()
+    for k, v := range xif5 {
+        fmt.Printf("%v %v\n", k, v)
+    }
+    
+    //return SCRUBBED!!
+    //return img.GetBytes() OR change to reader?
+    
 }
+
 
 func ExifFromDB(db *sql.DB, id int) Exif {
 	var exif Exif
@@ -223,8 +251,39 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 	return dst
 }
 
+func CreateThumb(original image.Image) image.Image {
+    //math to determine size of thumb goes here :)
+
+    thumb := Scale(original, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+    
+    /* if saving to file
+    f, _ := os.Create("testrescale.jpg")
+	defer f.Close()
+    jpeg.Encode(f, thumb, nil)
+    */
+    
+    return thumb
+}
+
 
 /* I used this to fuzz my db with galleries and images
+
+//unexported, i use this for fuzzing
+func loadBlob(dir string) {
+	items, _ := ioutil.ReadDir(dir)
+    for _, item := range items {
+			if item.IsDir() {continue}
+			//f, _ := os.Open(item.Name())
+			fmt.Println("<>><><><><><><><><><>===========Parsing", item.Name())
+			dat, err := ParseExif(dir+"/"+item.Name())
+			if err == nil {
+				for k, v := range dat {
+					fmt.Println(k, v)
+				}
+			}
+	}
+}
+
 func main() {
 	//loadBlob("dls")
 	
