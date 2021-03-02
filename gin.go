@@ -4,8 +4,8 @@ import (
 	"log"
 	"fmt"
 	_ "os"
-	"bufio"
-	_ "bytes"
+	_ "bufio"
+	"bytes"
 	"strings"
 	_"strconv"
 	"github.com/gin-gonic/gin"
@@ -19,7 +19,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"github.com/gin-contrib/multitemplate"
 	"path/filepath"
-	"image"
+	_ "image"
 	_ "image/jpeg"
 	_ "image/png"
 	_ "golang.org/x/image/draw"
@@ -192,6 +192,8 @@ func main() {
 		c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{})
 	})
 	rout.POST("/upload", func(c *gin.Context) {
+	    myUser, _ := c.Get("myUser")
+	
 		photoheader, _ := c.FormFile("photo") //get the form parameter 'photo' (type: *multipart.FileHeader)
 		file, err := photoheader.Open() //get associated file for parameter (type: File)
 
@@ -209,28 +211,15 @@ func main() {
 		}
 		file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
 		
-		if strings.HasPrefix(http.DetectContentType(buff), "image/") {
-		    rdr := bufio.NewReader(file)
-		
-		    uploaded, _, err := image.Decode(rdr)
-		    if err != nil || uploaded == nil {
-		        panic(err)
-		    }
+		var content_type string = http.DetectContentType(buff)
+		if strings.HasPrefix(content_type, "image/") {
+		    var extension string = strings.TrimPrefix(content_type, "image/")
+		    var scrubbed_image []byte = EraseGPS(file)
 		    
-		    file.Seek(0, 0)
-		    xif, err2 := ParseExif(file)
-		    fmt.Println("Err:", err2)
-		    if err2 != nil && err2.Error() != "no exif data" {
-		        log.Fatal(err)
-		    }
-		    fmt.Println("Time to print")
-		    for k, v := range xif {
-		        fmt.Println(k, v)
-		    }
-		    
-		    file.Seek(0, 0) //i could maybe make this a part of the function but then if I ever wanted to upload a file already at offset 0 I would lose fficiency :)
-		    EraseGPS(file)
-		    //UploadToCDN(file, "testywesty.jpeg")
+		    var thumb []byte = CreateThumb(scrubbed_image, extension)
+		    var main_path, thumb_path string = DefinePath(myUser.(User).Username, scrubbed_image, extension)
+		    UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
+		    UploadToCDN(bytes.NewReader(thumb), thumb_path)
 		   
 		    /*
 		    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)

@@ -15,6 +15,8 @@ import (
 	"image"
 	"golang.org/x/image/draw"
 	"github.com/kolesa-team/goexiv"
+	"image/jpeg"
+	"image/png"
 )
 
 type Exif map[string]string
@@ -62,7 +64,7 @@ func ParseExif(file io.Reader) (output Exif, err error) {
 	return final, nil
 }
 
-func EraseGPS(file io.Reader) {
+func EraseGPS(file io.Reader) []byte {
     //reader to bytes
     buf := new(bytes.Buffer)
     _, er := buf.ReadFrom(file)
@@ -76,11 +78,6 @@ func EraseGPS(file io.Reader) {
         panic(err)
     }
     
-    xif := img.GetExifData().AllTags()
-    for k, v := range xif {
-        fmt.Printf("%v %v\n", k, v)
-    }
-    
     img.SetExifString("Exif.GPSInfo.0x001f", "")
     img.SetExifString("Exif.GPSInfo.GPSLatitudeRef", "")
     img.SetExifString("Exif.GPSInfo.GPSLatitude", "")
@@ -91,14 +88,9 @@ func EraseGPS(file io.Reader) {
     img.SetExifString("Exif.GPSInfo.Speed", "")
     img.SetExifString("Exif.GPSInfo.ImgDirection", "")
     
-    xif5 := img.GetExifData().AllTags()
-    for k, v := range xif5 {
-        fmt.Printf("%v %v\n", k, v)
-    }
-    
     //return SCRUBBED!!
     //return img.GetBytes() OR change to reader?
-    
+    return img.GetBytes()
 }
 
 
@@ -251,18 +243,29 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 	return dst
 }
 
-func CreateThumb(original image.Image) image.Image {
+func CreateThumb(original []byte, extension string) []byte {
+    uploaded, _, err := image.Decode(bytes.NewReader(original)) //uploaded is image.Image
+	if err != nil || uploaded == nil {
+        panic(err)
+	}
+	
     //math to determine size of thumb goes here :)
-
-    thumb := Scale(original, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
     
-    /* if saving to file
-    f, _ := os.Create("testrescale.jpg")
-	defer f.Close()
-    jpeg.Encode(f, thumb, nil)
-    */
+    newimg := new(bytes.Buffer)
+    if extension == "jpeg" || extension == "jpg" {
+        err := jpeg.Encode(newimg, thumb, nil)
+        if err != nil {
+            panic(err)
+        }
+    } else if extension == "png" {
+        err := png.Encode(newimg, thumb)
+        if err != nil {
+            panic(err)
+        }
+    }
     
-    return thumb
+    return newimg.Bytes()
 }
 
 
