@@ -10,13 +10,14 @@ import (
 	"fmt"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
-	_"strconv"
+	"strconv"
 	_"time"
 	"image"
 	"golang.org/x/image/draw"
 	"github.com/kolesa-team/goexiv"
 	"image/jpeg"
 	"image/png"
+	"log"
 )
 
 type Exif map[string]string
@@ -66,19 +67,28 @@ func ParseExif(file io.Reader) (output Exif, err error) {
 
 func EraseGPS(file io.Reader) []byte {
     //reader to bytes
-    buf := new(bytes.Buffer)
-    _, er := buf.ReadFrom(file)
+    var buf bytes.Buffer
+    n_read, er := buf.ReadFrom(file)
     if er != nil {
         panic(er)
     }
+    if n_read < 1 {
+        log.Println("UHHH LESS THAN 1 BYTE READ")
+    }
     
     img, err := goexiv.OpenBytes(buf.Bytes())
-    img.ReadMetadata()
+    if err != nil {
+        panic(err)
+    }
+    err = img.ReadMetadata()
     if err != nil {
         panic(err)
     }
     
-    img.SetExifString("Exif.GPSInfo.0x001f", "")
+    //heq if i know why but without this line, trying to set exifstrings will cause a segfault when you try to read the image later :DDD
+    _ = img.GetExifData().AllTags()
+   
+    //img.SetExifString("Exif.GPSInfo.0x001f", "")
     img.SetExifString("Exif.GPSInfo.GPSLatitudeRef", "")
     img.SetExifString("Exif.GPSInfo.GPSLatitude", "")
     img.SetExifString("Exif.GPSInfo.GPSLongitude", "")
@@ -108,7 +118,7 @@ func ExifFromStruct(p Photo) Exif {
 	exif := make(Exif)
 	exif["Date Taken"] = p.Datetaken
 	exif["F-Stop"] = p.Fstop
-	exif["ISO"] = p.ISO
+	exif["ISO"] = string(p.ISO)
 	exif["Model"] = p.Model
 	exif["Lens"] = p.Lens
 	return exif
@@ -121,7 +131,7 @@ type Photo struct {
 	
 	Datetaken string
 	Fstop string
-	ISO string
+	ISO int
 	Model string
 	Lens string
 	
@@ -167,7 +177,7 @@ func InsertPhotoIntoDatabase(db *sql.DB, photo Photo) int64 {
 func NewGallery(db *sql.DB, owner int, date string, desc string) *Gallery {
 	var gallery Gallery
 	gallery.Owner = owner
-	gallery.Thumb = "1234"
+	gallery.Thumb = ""
 	gallery.Description = desc
 	gallery.Uploaded = date
 
@@ -189,10 +199,29 @@ func NewGallery(db *sql.DB, owner int, date string, desc string) *Gallery {
 	return &gallery
 }
 
+func UpdateGalleryDB(db *sql.DB, gallery Gallery) {
+    _, e := db.Exec("UPDATE galleries SET owner_id = ?, thumb = ?, description = ?, uploaded = ? WHERE gallery_id = ?",
+                    gallery.Owner,
+                    gallery.Thumb,
+                    gallery.Description,
+                    gallery.Uploaded,
+                    gallery.Id,
+            )
+    if e != nil {
+        panic(e)
+    }
+}
+
 //the exif map is all string, but my Photo struct/SQL table is typed. Probably because I have no foresight. Nonetheless!
 func NewPhoto(db *sql.DB, reference string, gallery int, exifmap Exif) *Photo {
+	var ISO int
+	if exifmap["ISO"] == "" {
+	    ISO = 0
+	} else {
+	    ISOtemp, _ := strconv.Atoi(exifmap["ISO"])
+	    ISO = ISOtemp
+	}
 	/*
-	iso, _ := strconv.Atoi(exifmap["ISO"])
 	var Fstop float64
 	if exifmap["F-Stop"] == "" {
 		Fstop = -0.0
@@ -203,11 +232,12 @@ func NewPhoto(db *sql.DB, reference string, gallery int, exifmap Exif) *Photo {
 		Fn2, _ := strconv.Atoi(Fn[1])
 		Fstop = 	float64(Fn1) / float64(Fn2)
 	}
-	
-	datetaken := exifmap["Date Taken"]
 	*/
+	
+	//datetaken := exifmap["Date Taken"]
+    
 
-	photo := Photo{-102, reference, gallery, exifmap["Date Taken"], exifmap["F-Stop"], exifmap["ISO"], exifmap["Model"], exifmap["Lens"], exifmap}
+	photo := Photo{-102, reference, gallery, exifmap["Date Taken"], exifmap["F-Stop"], ISO, exifmap["Model"], exifmap["Lens"], exifmap}
 	id := InsertPhotoIntoDatabase(db, photo)
 	photo.Id = id
 	return &photo
@@ -244,7 +274,8 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 }
 
 func CreateThumb(original []byte, extension string) []byte {
-    uploaded, _, err := image.Decode(bytes.NewReader(original)) //uploaded is image.Image
+    rdr := bytes.NewReader(original)
+    uploaded, _, err := image.Decode(rdr) //uploaded is image.Image
 	if err != nil || uploaded == nil {
         panic(err)
 	}

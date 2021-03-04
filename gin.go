@@ -24,7 +24,14 @@ import (
 	_ "image/png"
 	_ "golang.org/x/image/draw"
 	_ "mime/multipart"
+	"time"
 )
+
+func NowDateString() string {
+    t := time.Now()
+    ts := t.Format("06-01-02 15:04:05")
+    return ts
+}
 
 func AssembleDriverStr() string {
 	return fmt.Sprintf("%v:%v@/%v", Config.DBun, Config.DBpass, Config.DBdb)
@@ -192,11 +199,17 @@ func main() {
 		c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{})
 	})
 	rout.POST("/upload", func(c *gin.Context) {
-	    myUser, _ := c.Get("myUser")
+	    myUserI, _ := c.Get("myUser")
+	    myUser := myUserI.(User)
+	
+	    gal_descrip := c.PostForm("desc")
+	    gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
+		gid := int(gal.Id)
+		/*the creation of a new gallery based on an upload, before you make sure all the photos are legit and the upload will succeed, will
+		mean that canceled/errored uploads will create nonconsecutive gallery ids, but this is acceptable and even desirable*/
 	
 		photoheader, _ := c.FormFile("photo") //get the form parameter 'photo' (type: *multipart.FileHeader)
 		file, err := photoheader.Open() //get associated file for parameter (type: File)
-
 		if err != nil { 
 			c.String(500, "Error uploading file: " + err.Error()) 
 			c.Abort()
@@ -204,7 +217,11 @@ func main() {
 		defer file.Close()
 		
 		buff := make([]byte, 512) //verify image is valid https://stackoverflow.com/a/38175140/12514997
-		_, err = file.Read(buff)
+		n_read, err := file.Read(buff)
+		if n_read < 1 {
+		    c.String(500, "End of File reached")
+		    c.Abort()
+		}
 		if err != nil { 
 			c.String(500, "Error reading file for validation: " + err.Error()) 
 			c.Abort()
@@ -212,14 +229,32 @@ func main() {
 		file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
 		
 		var content_type string = http.DetectContentType(buff)
+		fmt.Println("content_type", content_type)
 		if strings.HasPrefix(content_type, "image/") {
 		    var extension string = strings.TrimPrefix(content_type, "image/")
-		    var scrubbed_image []byte = EraseGPS(file)
+		    fmt.Println("ext", extension)
 		    
+		    var scrubbed_image []byte = EraseGPS(file)
 		    var thumb []byte = CreateThumb(scrubbed_image, extension)
-		    var main_path, thumb_path string = DefinePath(myUser.(User).Username, scrubbed_image, extension)
+		    
+		    var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension)
 		    UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
 		    UploadToCDN(bytes.NewReader(thumb), thumb_path)
+		    
+		    if gal.Thumb == "" {
+		        gal.Thumb = thumb_path
+		    }
+		    
+		    exif, err := ParseExif(bytes.NewReader(scrubbed_image))
+		    if err != nil {
+		        if err.Error() == "no exif data" {
+		            exif = make(Exif)
+		            exif["Date Taken"], exif["F-Stop"], exif["ISO"], exif["Model"], exif["Lens"] = "","","","",""
+		        } else {
+		            panic(err)
+		        }
+		    }
+		    _ = NewPhoto(db, main_path, gid, exif) //created a new photo and inserted it into the DB
 		   
 		    /*
 		    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
