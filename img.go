@@ -18,7 +18,11 @@ import (
 	"image/jpeg"
 	"image/png"
 	"log"
+	"math"
 )
+
+var maxWidth int = 200
+var maxHeight int = 200
 
 type Exif map[string]string
 
@@ -284,6 +288,11 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 	return dst
 }
 
+func DetermineNewSize(w int, h int) (int, int) { //https://stackoverflow.com/a/14731922/12514997
+    var ratio float64 = math.Min(float64(maxWidth) / float64(w), float64(maxHeight) / float64(h))
+    return int(float64(w) * ratio), int(float64(h) * ratio)
+}
+
 func CreateThumb(original []byte, extension string) []byte {
     rdr := bytes.NewReader(original)
     uploaded, _, err := image.Decode(rdr) //uploaded is image.Image
@@ -291,8 +300,8 @@ func CreateThumb(original []byte, extension string) []byte {
         panic(err)
 	}
 	
-    //math to determine size of thumb goes here :)
-    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+    newW, newH := DetermineNewSize(uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
+    thumb := Scale(uploaded, image.Rect(0, 0, newW, newH), draw.ApproxBiLinear)
     
     newimg := new(bytes.Buffer)
     if extension == "jpeg" || extension == "jpg" {

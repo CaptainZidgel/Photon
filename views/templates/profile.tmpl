@@ -93,12 +93,12 @@ function changeSlide(gallery, direction) {
 				<div class="gallery-thumb">
 					<img src="{{$g.Thumb}}" alt="{{$g.Id}}" onclick="toggleModal({{$gi}})">
 				</div>
-
+                <!--
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
 					<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div><div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
 					{{range $pi, $p := $g.Photos}}
 						<span class="slide" id="slide-{{$gi}}:{{$pi}}">
-							<table class="infobox">
+							<table class="infobox img-exif">
 								{{range $k, $v := $p.Exif}}
 								<tr>
 									<td>{{$k}}</td>
@@ -106,7 +106,7 @@ function changeSlide(gallery, direction) {
 								</tr>
 								{{end}}
 							</table>
-							<img src="{{ $p.Reference }}" class="photo"> <!---->
+							<img src="{{ $p.Reference }}" class="photo">
 						</span>
 					{{end}}
 					
@@ -119,6 +119,40 @@ function changeSlide(gallery, direction) {
 						</span>
 					</div>
 				</div>
+				-->
+				
+				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
+					<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div><div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
+					<div class="infobox gal-info">
+						<span class="description">
+						    {{ $g.Description }}
+						</span>
+						<span class="gallery-upload-stamp">
+						    {{ $g.Uploaded }}
+						</span>
+					</div>
+					{{range $pi, $p := $g.Photos}}
+						<span class="slide" id="slide-{{$gi}}:{{$pi}}">
+							<img src="{{ $p.Reference }}" class="photo">
+							<table class="infobox img-exif">
+								{{range $k, $v := $p.Exif}}
+								<tr>
+									<td>{{$k}}</td>
+									<td>{{$v}}<td>
+								</tr>
+								{{end}}
+							</table>
+						</span>
+					{{end}}
+					
+					
+				</div>
+				
+				
+				
+				
+				
+				
 			{{end}}
 		{{end}}
 	</div>
@@ -160,6 +194,8 @@ function changeSlide(gallery, direction) {
   display: block;
   margin-left: auto;
   margin-right: auto;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .prev, .next {

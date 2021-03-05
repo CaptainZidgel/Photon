@@ -196,11 +196,25 @@ func main() {
 
 	rout.GET("/upload", func(c *gin.Context) {
 		//if registered
-		c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{})
+		myUserI, exists := c.Get("myUser")
+		
+		if exists {
+		    myUser := myUserI.(User)
+		    c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{"myUser": myUser})
+		} else {
+		    c.String(http.StatusUnauthorized, "You must be logged in to upload.")
+		}
 	})
 	rout.POST("/upload", func(c *gin.Context) {
-	    myUserI, _ := c.Get("myUser")
-	    myUser := myUserI.(User)
+	    myUserI, exists := c.Get("myUser")
+	    var myUser User
+	    
+	    if !exists {
+	        c.String(http.StatusUnauthorized, "You must be logged in to upload")
+	        c.Abort()
+	    }
+	    
+	    myUser = myUserI.(User)
 	
 	    gal_descrip := c.PostForm("desc")
 	    gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
