@@ -199,7 +199,7 @@ func NewGallery(db *sql.DB, owner int, date string, desc string) *Gallery {
 	return &gallery
 }
 
-func UpdateGalleryDB(db *sql.DB, gallery Gallery) {
+func UpdateGalleryDB(db *sql.DB, gallery *Gallery) {
     _, e := db.Exec("UPDATE galleries SET owner_id = ?, thumb = ?, description = ?, uploaded = ? WHERE gallery_id = ?",
                     gallery.Owner,
                     gallery.Thumb,
@@ -256,13 +256,24 @@ func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) {	//("SELECT * FROM photo
 		if err := rows.Scan(&photo.Reference, &photo.Id, &photo.Gallery_id, &photo.Datetaken, &photo.Fstop, &photo.ISO, &photo.Model, &photo.Lens); err != nil {
 			panic(err)
 		}
+		if !strings.HasPrefix(photo.Reference, "http") {
+		    photo.Reference = StorageZoneRead + photo.Reference //not efficient at large scale but i dont think this is large scale to care about that?
+		}
 		photo.Exif = ExifFromStruct(photo)
 		photos = append(photos, photo)
 	}
 	gallery.Photos = photos
+	
 	if len(photos) > 0 {
-		gallery.Thumb = photos[0].Reference
+	    if gallery.Thumb == "" {
+		    gallery.Thumb = photos[0].Reference
+		} else {
+		    if !strings.HasPrefix(gallery.Thumb, "http") {
+		        gallery.Thumb = StorageZoneRead + gallery.Thumb
+		    }
+		}
 	}
+	
 }
 
 // https://github.com/nfnt/resize/issues/63#issuecomment-540704731

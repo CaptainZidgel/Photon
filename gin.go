@@ -238,11 +238,16 @@ func main() {
 		    var thumb []byte = CreateThumb(scrubbed_image, extension)
 		    
 		    var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension)
-		    UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
+		    err := UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
+		    if err != nil {
+		        panic(err)
+		    }
 		    UploadToCDN(bytes.NewReader(thumb), thumb_path)
 		    
 		    if gal.Thumb == "" {
 		        gal.Thumb = thumb_path
+		        UpdateGalleryDB(db, gal)
+		        fmt.Println("Setting thumb", thumb_path)
 		    }
 		    
 		    exif, err := ParseExif(bytes.NewReader(scrubbed_image))
