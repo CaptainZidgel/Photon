@@ -314,6 +314,8 @@ func CreateThumb(original []byte, extension string) []byte {
         if err != nil {
             panic(err)
         }
+    } else {
+        panic(fmt.Sprintf("HMMMM %s", extension))
     }
     
     return newimg.Bytes()

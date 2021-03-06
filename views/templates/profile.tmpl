@@ -91,7 +91,7 @@ function changeSlide(gallery, direction) {
 		{{range $gi, $g := .Galleries}}
 			{{if $g.Photos}}
 				<div class="gallery-thumb">
-					<img src="{{$g.Thumb}}" alt="{{$g.Id}}" onclick="toggleModal({{$gi}})">
+					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}})"> <!-- alt="{{$g.Id}}" no alt at the moment, want a clickable image, ideally I'd like to make images NEVER break :D-->
 				</div>
                 <!--
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">

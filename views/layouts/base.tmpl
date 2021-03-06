@@ -2,7 +2,7 @@
 <body>
 <div id="header">
 	{{if .myUser}}
-	<span id="self-ref">Hi, <a href="/profiles/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
+	<span id="self-ref">Hi, <a href="/p/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
 	<span id="logio"><a href="/logout">Logout</a></span>
 	{{else}}
 	<span id="logio"><a href="/login">Login</a></span>

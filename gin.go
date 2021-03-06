@@ -73,6 +73,8 @@ func main() {
 	db, err := sql.Open("mysql", AssembleDriverStr())
 	if err != nil { log.Fatal(err) }
 	defer db.Close()
+	
+	PurgeLostMedia(db)
 
 	/* Prepared statements need only be used for queries you anticipate will be frequent.								*/
 	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?)")
@@ -196,9 +198,9 @@ func main() {
 
 	rout.GET("/upload", func(c *gin.Context) {
 		//if registered
-		myUserI, exists := c.Get("myUser")
+		myUserI, _ := c.Get("myUser") //this second result is a bool if the key exists, but it always exists: its just nil if you're not logged in
 		
-		if exists {
+		if myUserI != nil {
 		    myUser := myUserI.(User)
 		    c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{"myUser": myUser})
 		} else {
@@ -206,10 +208,10 @@ func main() {
 		}
 	})
 	rout.POST("/upload", func(c *gin.Context) {
-	    myUserI, exists := c.Get("myUser")
+	    myUserI, _ := c.Get("myUser")
 	    var myUser User
 	    
-	    if !exists {
+	    if myUserI == nil {
 	        c.String(http.StatusUnauthorized, "You must be logged in to upload")
 	        c.Abort()
 	    }
@@ -222,74 +224,91 @@ func main() {
 		/*the creation of a new gallery based on an upload, before you make sure all the photos are legit and the upload will succeed, will
 		mean that canceled/errored uploads will create nonconsecutive gallery ids, but this is acceptable and even desirable*/
 	
-		photoheader, _ := c.FormFile("photo") //get the form parameter 'photo' (type: *multipart.FileHeader)
-		file, err := photoheader.Open() //get associated file for parameter (type: File)
-		if err != nil { 
-			c.String(500, "Error uploading file: " + err.Error()) 
-			c.Abort()
-		}
-		defer file.Close()
-		
-		buff := make([]byte, 512) //verify image is valid https://stackoverflow.com/a/38175140/12514997
-		n_read, err := file.Read(buff)
-		if n_read < 1 {
-		    c.String(500, "End of File reached")
-		    c.Abort()
-		}
-		if err != nil { 
-			c.String(500, "Error reading file for validation: " + err.Error()) 
-			c.Abort()
-		}
-		file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
-		
-		var content_type string = http.DetectContentType(buff)
-		fmt.Println("content_type", content_type)
-		if strings.HasPrefix(content_type, "image/") {
-		    var extension string = strings.TrimPrefix(content_type, "image/")
-		    fmt.Println("ext", extension)
-		    
-		    var scrubbed_image []byte = EraseGPS(file)
-		    var thumb []byte = CreateThumb(scrubbed_image, extension)
-		    
-		    var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension)
-		    err := UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
-		    if err != nil {
-		        panic(err)
+	    uploaded_gallery, ug_err := c.MultipartForm()
+	    if ug_err != nil {
+	        c.String(http.StatusBadRequest, fmt.Sprintf("Form err: %s", ug_err.Error()))
+	        return
+	    }
+	    photos := uploaded_gallery.File["files"] //get the parameter named "files" from the form
+	    
+	    for p_index, photoheader := range photos { 
+		    file, err := photoheader.Open() //get associated file for parameter (type: File)
+		    if err != nil { 
+			    c.String(500, "Error uploading file: " + err.Error()) 
+			    c.Abort()
 		    }
-		    UploadToCDN(bytes.NewReader(thumb), thumb_path)
+		    defer file.Close()
 		    
-		    if gal.Thumb == "" {
-		        gal.Thumb = thumb_path
-		        UpdateGalleryDB(db, gal)
-		        fmt.Println("Setting thumb", thumb_path)
+		    buff := make([]byte, 512) //verify image is valid https://stackoverflow.com/a/38175140/12514997
+		    n_read, err := file.Read(buff)
+		    if n_read < 1 {
+		        c.String(500, "End of File reached")
+		        c.Abort()
 		    }
+		    if err != nil { 
+			    c.String(500, "Error reading file for validation: " + err.Error()) 
+			    c.Abort()
+		    }
+		    file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
 		    
-		    exif, err := ParseExif(bytes.NewReader(scrubbed_image))
-		    if err != nil {
-		        if err.Error() == "no exif data" {
-		            exif = make(Exif)
-		            exif["Date Taken"], exif["F-Stop"], exif["ISO"], exif["Model"], exif["Lens"] = "","","","",""
-		        } else {
+		    var content_type string = http.DetectContentType(buff)
+		    fmt.Println("content_type", content_type)
+		    if strings.HasPrefix(content_type, "image/") {
+		        var extension string = strings.TrimPrefix(content_type, "image/")
+		        fmt.Println("ext", extension)
+		        
+		        var scrubbed_image []byte = EraseGPS(file)
+		        var thumb []byte
+		        
+		        var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension)
+		        err := UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
+		        if err != nil {
 		            panic(err)
 		        }
+		        if p_index == 0 {
+		            var buf bytes.Buffer
+		            file.Seek(0, 0)
+		            buf.ReadFrom(file)
+		            thumb = CreateThumb(buf.Bytes(), extension)
+		            err := UploadToCDN(bytes.NewReader(thumb), thumb_path)
+		            if err != nil {
+		                panic(err)
+		            }
+		        }
+		        
+		        if gal.Thumb == "" {
+		            gal.Thumb = thumb_path
+		            UpdateGalleryDB(db, gal)
+		            fmt.Println("Setting thumb", thumb_path)
+		        }
+		        
+		        exif, err := ParseExif(bytes.NewReader(scrubbed_image))
+		        if err != nil {
+		            if err.Error() == "no exif data" {
+		                exif = make(Exif)
+		                exif["Date Taken"], exif["F-Stop"], exif["ISO"], exif["Model"], exif["Lens"] = "","","","",""
+		            } else {
+		                panic(err)
+		            }
+		        }
+		        _ = NewPhoto(db, main_path, gid, exif) //created a new photo and inserted it into the DB
+		       
+		        /*
+		        thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
+		        f, _ := os.Create("testrescale.jpg")
+		        defer f.Close()
+		        jpeg.Encode(f, thumb, nil)
+		        */
+		    } else {
+			    c.String(415, "Unsupported file type") //415 -> Media type unsupported
+			    c.Abort()
 		    }
-		    _ = NewPhoto(db, main_path, gid, exif) //created a new photo and inserted it into the DB
-		   
-		    /*
-		    thumb := Scale(uploaded, image.Rect(0, 0, 200, 200), draw.ApproxBiLinear)
-		    f, _ := os.Create("testrescale.jpg")
-		    defer f.Close()
-		    jpeg.Encode(f, thumb, nil)
-		    */
-		} else {
-			c.String(415, "Unsupported file type") //415 -> Media type unsupported
-			c.Abort()
-		}
+        }
 
 		c.String(200, "OK")
 	})
 
-	rout.GET("/profiles/:path", func(c *gin.Context) {
+	rout.GET("/p/:path", func(c *gin.Context) {
 		myUser, _ := c.Get("myUser")
 
 		path := c.Param("path")
