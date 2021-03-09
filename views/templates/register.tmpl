@@ -1,12 +1,13 @@
+<!---->
 {{define "content"}}
-
 <div id="body">
 {{if .myUser}}
 	<p>You are currently logged in as {{.myUser.Displayname}} ({{.myUser.Username}})</p>
 {{else}}
 	<form action="" method="POST">
-		Username <input type="text" name="username"><br>
+		Username <input type="text" name="username" {{if .username}}value="{{.username}}"{{end}}><br>
 		Password <input type="password" name="password"><br>
+		Confirm Password <input type="password" name="conf_password"><br>
 		<input type="submit">
 	</form>
 {{end}}

@@ -8,6 +8,7 @@
 	<span id="logio"><a href="/login">Login</a></span>
 	{{end}}
 </div>
+{{if .Error}}<p class="err">{{.Error}}</p>{{end}}
 {{template "content" . }}
 </body>
 <style>
@@ -28,6 +29,10 @@
 	a {
 		color: white;
 		text-decoration: none;
+	}
+	
+	.err {
+	    color: red;
 	}
 </style>
 </html>

@@ -24,20 +24,15 @@ import (
 	_ "image/png"
 	_ "golang.org/x/image/draw"
 	_ "mime/multipart"
-	"time"
 )
-
-func NowDateString() string {
-    t := time.Now()
-    ts := t.Format("06-01-02 15:04:05")
-    return ts
-}
 
 func AssembleDriverStr() string {
 	return fmt.Sprintf("%v:%v@/%v", Config.DBun, Config.DBpass, Config.DBdb)
 }
 
-type User struct {
+var reserved_unames_arr []string = []string{ "a", "b" }
+
+type User struct { // &user.id, &user.Username, &user.Displayname, &user.Avatar
 	id int
 	Username string
 	Displayname string
@@ -65,6 +60,9 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 }
 
 func main() {
+    fmt.Println("Ready")
+    reserved_unames := ReservedNames("reserved_names.csv")
+
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	fmt.Printf("conf: %v\n", Config)
@@ -74,7 +72,7 @@ func main() {
 	if err != nil { log.Fatal(err) }
 	defer db.Close()
 	
-	PurgeLostMedia(db)
+	//PurgeLostMedia(db)
 
 	/* Prepared statements need only be used for queries you anticipate will be frequent.								*/
 	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?)")
@@ -128,19 +126,34 @@ func main() {
 		username := c.PostForm("username")
 		if utf8.ValidString(username) {
 			cleanUN := nfkd(username)
-			var Result string
-			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&Result)
+			
+			if reserved_unames[username] || !VerifyUsername(username) {
+		        c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is not permitted"})
+		        return
+		    }
+		    
+			var user User
+			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar)
 			if notok != sql.ErrNoRows {
 				if notok != nil { log.Fatal(notok) }
-				c.Abort()
+				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is already taken"})
+				return
 			} else {	//error IS "no rows found"
 				display_name := c.DefaultPostForm("display", username)
 				username = cleanUN
+				
+				err := VerifyPasswordBasic(true, c.PostForm("password"), c.PostForm("conf_password"), "")
+                if err != nil {
+                    c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": err.Error(), "username": username})
+                    return
+                }
 				passw := []byte(c.PostForm("password"))
+				//generate password hash
 				hash, err := bcrypt.GenerateFromPassword(passw, Config.PassCost)
 				if err != nil { log.Panic(err) }
 				
-				_, err2 := sqlINSERTuser.Exec(nil, username, display_name, hash)	//Exec does not return useful information related to the results of the query, therefore it is only appropriate for INSERT & UPDATE statements.
+				//create user in db
+				_, err2 := sqlINSERTuser.Exec(nil, username, display_name, hash, nil)	//Exec does not return useful information related to the results of the query, therefore it is only appropriate for INSERT & UPDATE statements.
 				if err2 != nil { log.Panic(err2) }
 				
 				c.Redirect(http.StatusSeeOther, "/")
@@ -184,15 +197,59 @@ func main() {
 		c.Abort()
 	})
 	
+    
+    rout.GET("/update_password", func(c *gin.Context) {
+        //CHECK HERE IF LOGGED IN
+        c.HTML(http.StatusOK, "update_password.tmpl", gin.H{})
+    })
 	rout.POST("/update_password", func(c *gin.Context) {
-	    un := c.PostForm("username")
-	    pass := []byte(c.PostForm("password")) //new desired password
+	    myUser, _ := c.Get("myUser")
 	    
-	    hash, err := bcrypt.GenerateFromPassword(pass, Config.PassCost)
-		if err != nil { log.Panic(err) }
-		
-		_, err = sqlUPDATEuserPASS.Exec(hash, un)
-		if err != nil { log.Panic(err) }
+	    if myUser == nil {
+	        c.String(http.StatusUnauthorized, "You must be logged in.")
+	        return
+	    } else {
+	        un := myUser.(User).Username
+	    
+	        oldpass := c.PostForm("oldpassword")
+	        newpass := c.PostForm("newpassword") //new desired password
+	        conf_new := c.PostForm("conf_newpassword")
+	        err := VerifyPasswordBasic(false, newpass, conf_new, oldpass)
+	        if err != nil {
+	            c.String(http.StatusForbidden, err.Error())
+	            //c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": err.Error(), "username": username})
+	            return
+	        }
+	        
+	        //confirm user knows old pass
+	        var tempPass string
+		    sqlSELECTuserPASS.QueryRow(un).Scan(&tempPass)
+		    err = bcrypt.CompareHashAndPassword([]byte(tempPass), []byte(oldpass))
+		    if err != nil {
+			    //c.Redirect(401, "BAD PASSWORD")	//THIS NEEDS TO BE FIXEd
+			    c.String(http.StatusForbidden, "Old password is incorrect")			//THIS DOESNT STOP THIS THREAD
+			    return
+		    }
+	        
+	        //create new pass hash
+	        hash, err := bcrypt.GenerateFromPassword([]byte(newpass), Config.PassCost)
+		    if err != nil { 
+		        log.Panic(err)
+		        c.String(500, err.Error())
+		        return
+		    }
+		    
+		    //
+		    //update password
+		    _, err = sqlUPDATEuserPASS.Exec(hash, un)
+		    if err != nil { 
+		        log.Panic(err)
+		        c.String(500, err.Error())
+		        return 
+		    }
+		    c.String(http.StatusOK, "Password updated")
+		    return
+	    }
 	    
 	})
 
@@ -204,7 +261,9 @@ func main() {
 		    myUser := myUserI.(User)
 		    c.HTML(http.StatusOK, "upload_form.tmpl", gin.H{"myUser": myUser})
 		} else {
-		    c.String(http.StatusUnauthorized, "You must be logged in to upload.")
+		    //c.String(http.StatusUnauthorized, "You must be logged in to upload.")
+		    c.HTML(http.StatusUnauthorized, "upload_form.tmpl", gin.H{"Error": "You must be logged in to upload"})
+		    return
 		}
 	})
 	rout.POST("/upload", func(c *gin.Context) {
@@ -212,8 +271,8 @@ func main() {
 	    var myUser User
 	    
 	    if myUserI == nil {
-	        c.String(http.StatusUnauthorized, "You must be logged in to upload")
-	        c.Abort()
+	        c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to upload"})
+		    return
 	    }
 	    
 	    myUser = myUserI.(User)
