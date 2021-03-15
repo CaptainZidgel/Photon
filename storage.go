@@ -69,14 +69,21 @@ func UploadToCDN(file io.Reader, path string) (error) {
 }
 
 //Should create/import some sort of algo to give every image a hash (not necessarily based on image itself) for cdn storage. +_thumb where appropriate.
-func DefinePath(username string, file []byte, ext string) (string, string) {
+func DefinePath(username string, file []byte, ext string, typ string) (string, string) {
     image_hash := md5.Sum(file)
     t := time.Now()
     year := t.Year()
     yearday := t.YearDay()
-    
-    final := fmt.Sprintf("%s/%d/%d/%x%s.%s", username, year, yearday, image_hash, "", ext)
-    thumb_final := fmt.Sprintf("%s/%d/%d/%x%s.%s", username, year, yearday, image_hash, "_thumb", ext)
+    nanosec := t.Nanosecond()
+    var final, thumb_final string
+    if typ == "image" {
+        final = fmt.Sprintf("%s/%d/%d/%x%s.%s", username, year, yearday, image_hash, "", ext)
+        thumb_final = fmt.Sprintf("%s/%d/%d/%x%s.%s", username, year, yearday, image_hash, "_thumb", ext)
+    } else if typ == "avatar" {
+        final = fmt.Sprintf("_avatar/%d-%x.%s", nanosec, image_hash, ext)
+    } else {
+        panic("Bad image type")
+    }
     return final, thumb_final
 }
 

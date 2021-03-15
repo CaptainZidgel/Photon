@@ -7,7 +7,7 @@
 	<form action="" method="POST">
 		Username <input type="text" name="username" {{if .username}}value="{{.username}}"{{end}}><br>
 		Password <input type="password" name="password"><br>
-		Confirm Password <input type="password" name="conf_password"><br>
+		{{if .registration}} Confirm Password <input type="password" name="conf_password"><br>{{end}}
 		<input type="submit">
 	</form>
 {{end}}

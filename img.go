@@ -293,14 +293,20 @@ func DetermineNewSize(w int, h int) (int, int) { //https://stackoverflow.com/a/1
     return int(float64(w) * ratio), int(float64(h) * ratio)
 }
 
-func CreateThumb(original []byte, extension string) []byte {
+//pass a byte slice of an original image, pass the extension (so we know how to encode it), pass a bool indicating if it is an image to be automatically resized (thumbnail for uploaded image) or a profile picture with a fixed final size
+func CreateThumb(original []byte, extension string, autores bool) []byte {
     rdr := bytes.NewReader(original)
     uploaded, _, err := image.Decode(rdr) //uploaded is image.Image
 	if err != nil || uploaded == nil {
         panic(err)
 	}
 	
-    newW, newH := DetermineNewSize(uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
+	var newW, newH int
+	if autores {    //if should be automatically resized
+        newW, newH = DetermineNewSize(uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
+    } else { //this is a pfp
+        newW, newH = 256, 256
+    }
     thumb := Scale(uploaded, image.Rect(0, 0, newW, newH), draw.ApproxBiLinear)
     
     newimg := new(bytes.Buffer)

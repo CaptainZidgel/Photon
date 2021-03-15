@@ -52,6 +52,7 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 					c.Set("myUser", nil)
 				}
 			}
+			myUser.Avatar = StorageZoneRead + myUser.Avatar
 			c.Set("myUser", myUser)
 		} else {
 			c.Set("myUser", nil)
@@ -103,6 +104,10 @@ func main() {
 	if err != nil {log.Fatal(err) }
 	defer sqlUPDATEuserPASS.Close()
 	
+	sqlUPDATEuserAVATAR, err := db.Prepare("UPDATE users SET avatar = ? WHERE username = ?")
+	if err != nil {log.Fatal(err) }
+	defer sqlUPDATEuserAVATAR.Close()
+	
 	/*																																																		*/
 
 	rout := gin.Default()
@@ -120,7 +125,7 @@ func main() {
 	})
 	
 	rout.GET("/register", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "register.tmpl", gin.H{})
+		c.HTML(http.StatusOK, "register.tmpl", gin.H{"registration": true})
 	})
 	rout.POST("/register", func(c *gin.Context) {
 		username := c.PostForm("username")
@@ -128,7 +133,7 @@ func main() {
 			cleanUN := nfkd(username)
 			
 			if reserved_unames[username] || !VerifyUsername(username) {
-		        c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is not permitted"})
+		        c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is not permitted", "registration": true})
 		        return
 		    }
 		    
@@ -136,7 +141,7 @@ func main() {
 			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar)
 			if notok != sql.ErrNoRows {
 				if notok != nil { log.Fatal(notok) }
-				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is already taken"})
+				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is already taken", "registration": true})
 				return
 			} else {	//error IS "no rows found"
 				display_name := c.DefaultPostForm("display", username)
@@ -311,7 +316,6 @@ func main() {
 		    file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
 		    
 		    var content_type string = http.DetectContentType(buff)
-		    fmt.Println("content_type", content_type)
 		    if strings.HasPrefix(content_type, "image/") {
 		        var extension string = strings.TrimPrefix(content_type, "image/")
 		        fmt.Println("ext", extension)
@@ -319,16 +323,16 @@ func main() {
 		        var scrubbed_image []byte = EraseGPS(file)
 		        var thumb []byte
 		        
-		        var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension)
+		        var main_path, thumb_path string = DefinePath(myUser.Username, scrubbed_image, extension, "image")
 		        err := UploadToCDN(bytes.NewReader(scrubbed_image), main_path)
 		        if err != nil {
 		            panic(err)
 		        }
-		        if p_index == 0 {
+		        if p_index == 0 { //if this is the first image in the set
 		            var buf bytes.Buffer
 		            file.Seek(0, 0)
 		            buf.ReadFrom(file)
-		            thumb = CreateThumb(buf.Bytes(), extension)
+		            thumb = CreateThumb(buf.Bytes(), extension, true)
 		            err := UploadToCDN(bytes.NewReader(thumb), thumb_path)
 		            if err != nil {
 		                panic(err)
@@ -373,6 +377,7 @@ func main() {
 		path := c.Param("path")
 		var user User
 		err := sqlSELECTuserNAME.QueryRow(path).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar)
+		user.Avatar = StorageZoneRead + user.Avatar
 		if err != nil {
 			if err == sql.ErrNoRows { 
 				c.String(404, "This profile doesn't exist")
@@ -393,16 +398,6 @@ func main() {
 			PopulateGallery(sqlSELECTphotos, &gallery)
 			gals = append(gals, gallery)
 		}
-		/*
-		photos := make([]Photo, 0)
-		for rows.Next() {
-			var photo Photo
-			if err := rows.Scan(&photo.Owner, &photo.Reference, &photo.Id, &photo.Description); err != nil {
-				log.Fatal(err)
-			}
-			photos = append(photos, photo)
-		}
-		*/
 
 		var SameUser bool
 		if myUser != nil && myUser.(User).id == user.id {
@@ -418,15 +413,60 @@ func main() {
 		o := c.Param("o")
 		c.String(200, nfkd(o))
 	})
-    /*
+
 	rout.POST("/update_avatar", func(c *gin.Context) {
-		url := c.PostForm("url")
-		myUser, _ := c.Get("myUser")
-		if myUser != nil {//crunge
-		    //unimplemented
-		}
+		myUserI, _ := c.Get("myUser")
+		if myUserI == nil {
+	        c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to change your profile picture"})
+		    return
+	    }
+	    
+	    var myUser User = myUserI.(User)
+	    
+	    fileheader, _ := c.FormFile("pfp")
+	    file, err := fileheader.Open()
+	    if err != nil {
+	        c.String(500, "Error uploading file: " + err.Error())
+	        return
+	    }
+	    defer file.Close()
+	    
+        vbuf := make([]byte, 512) //verify image is valid https://stackoverflow.com/a/38175140/12514997
+        n_read, err := file.Read(vbuf)
+        if n_read < 1 {
+            c.String(500, "End of File reached")
+            c.Abort()
+        }
+        if err != nil { 
+            c.String(500, "Error reading file for validation: " + err.Error()) 
+            c.Abort()
+        }
+        file.Seek(0, 0) //file.Read(buff) consumed our bytes, reset to start
+        
+        var content_type string = http.DetectContentType(vbuf)
+	    if strings.HasPrefix(content_type, "image/") {
+	        var extension string = strings.TrimPrefix(content_type, "image/")
+	        
+	        var scrubbed_image []byte = EraseGPS(file)
+	        var thumb []byte
+	        
+	        var main_path, _ string = DefinePath("Noneedforthisparam", scrubbed_image, extension, "avatar")
+	        thumb = CreateThumb(scrubbed_image, extension, false)
+            err := UploadToCDN(bytes.NewReader(thumb), main_path)
+            if err != nil {
+                panic(err)
+            }
+            _, err = sqlUPDATEuserAVATAR.Exec(main_path, myUser.Username)
+            if err != nil {
+                panic(err)
+            }
+            
+            c.JSON(201, gin.H{"url": StorageZoneRead+main_path})
+            return
+	    }
+	    c.String(415, "Unsupported file type")
 	})
-    */
+
 	rout.Run()
 }
 
