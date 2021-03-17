@@ -88,6 +88,7 @@ func DefinePath(username string, file []byte, ext string, typ string) (string, s
 }
 
 func PurgeLostMedia(db *sql.DB) {
+    //usr photos
     rows, err := db.Query("SELECT ref, id FROM photos")
     if err != nil {
         panic(err)
@@ -112,4 +113,32 @@ func PurgeLostMedia(db *sql.DB) {
 	        }
 	    }
 	}
+	
+	/*
+	//avatars
+	rows2, err := db.Query("SELECT avatar FROM users")
+	if err != nil {
+	    panic(err)
+	}
+	defer rows2.Close()
+	usrs := make([]User, 0)
+	for rows2.Next() {
+	    var user User
+	    if err := rows.Scan(&user.Avatar); err != nil {
+	        panic(err)
+	    }
+	    usrs = append(usrs, user)
+	}
+	
+	for _, user := range usrs {
+	    if !strings.HasPrefix(photo.Reference, "http") {
+	        szpath := fmt.Sprintf("%v%v", StorageZoneWrite, user.Avatar)
+	        _, status := readFromStorage(szpath)
+	        fmt.Println(status)
+	        if status == 404 {
+	            db.Exec("DELETE FROM photos WHERE id = ?", photo.Id)
+	        }
+	    }
+	}
+	*/
 }

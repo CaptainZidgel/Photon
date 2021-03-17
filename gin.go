@@ -37,6 +37,7 @@ type User struct { // &user.id, &user.Username, &user.Displayname, &user.Avatar
 	Username string
 	Displayname string
 	Avatar string
+	Bio string
 }
 
 func GetUser(database *sql.DB) gin.HandlerFunc {
@@ -44,7 +45,7 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 		var myUser User
 		username := sessions.Default(c).Get("username")
 		if username != nil {
-			err := database.QueryRow("SELECT user_id, username, displayname, avatar FROM users WHERE username = ?", username).Scan(&myUser.id, &myUser.Username, &myUser.Displayname, &myUser.Avatar)
+			err := database.QueryRow("SELECT user_id, username, displayname, avatar, bio FROM users WHERE username = ?", username).Scan(&myUser.id, &myUser.Username, &myUser.Displayname, &myUser.Avatar, &myUser.Bio)
 			if err != nil { 
 				if err != sql.ErrNoRows {
 					log.Fatal(err) 
@@ -76,7 +77,7 @@ func main() {
 	//PurgeLostMedia(db)
 
 	/* Prepared statements need only be used for queries you anticipate will be frequent.								*/
-	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?)")
+	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?, '')")
 	if err != nil { log.Fatal(err) }
 	defer sqlINSERTuser.Close()
 	
@@ -84,7 +85,7 @@ func main() {
 	if err != nil { log.Fatal(err) }
 	defer sqlSELECTuserID.Close()
 	
-	sqlSELECTuserNAME, err := db.Prepare("SELECT user_id, username, displayname, avatar FROM users WHERE username = ?")
+	sqlSELECTuserNAME, err := db.Prepare("SELECT user_id, username, displayname, avatar, bio FROM users WHERE username = ?")
 	if err != nil { log.Fatal(err) }
 	defer sqlSELECTuserNAME.Close()
 			
@@ -107,6 +108,10 @@ func main() {
 	sqlUPDATEuserAVATAR, err := db.Prepare("UPDATE users SET avatar = ? WHERE username = ?")
 	if err != nil {log.Fatal(err) }
 	defer sqlUPDATEuserAVATAR.Close()
+	
+	sqlUPDATEuserBIO, err := db.Prepare("UPDATE users SET bio = ? WHERE username = ?")
+	if err != nil {log.Fatal(err) }
+	defer sqlUPDATEuserBIO.Close()
 	
 	/*																																																		*/
 
@@ -138,7 +143,7 @@ func main() {
 		    }
 		    
 			var user User
-			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar)
+			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
 			if notok != sql.ErrNoRows {
 				if notok != nil { log.Fatal(notok) }
 				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is already taken", "registration": true})
@@ -376,7 +381,7 @@ func main() {
 
 		path := c.Param("path")
 		var user User
-		err := sqlSELECTuserNAME.QueryRow(path).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar)
+		err := sqlSELECTuserNAME.QueryRow(path).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
 		user.Avatar = StorageZoneRead + user.Avatar
 		if err != nil {
 			if err == sql.ErrNoRows { 
@@ -465,6 +470,25 @@ func main() {
             return
 	    }
 	    c.String(415, "Unsupported file type")
+	})
+	
+	rout.POST("/update_bio", func(c *gin.Context) {
+	    myUserI, _ := c.Get("myUser")
+	    if myUserI == nil {
+	        c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to change your profile picture"})
+		    return
+	    }
+	    myUser := myUserI.(User)
+	    
+	    bio := c.PostForm("biography")
+	    //no validation lmao
+	    _, err = sqlUPDATEuserBIO.Exec(bio, myUser.Username)
+	    if err != nil {
+	        panic(err)
+	    }
+	    
+	    c.JSON(200, gin.H{})
+	    return
 	})
 
 	rout.Run()

@@ -2,7 +2,46 @@
 {{define "content"}}
 <head><title>{{.User.Username}}</title></head>
 <script type="text/javascript">
-{{if .SameUser}}
+
+{{if .SameUser}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
+    //https://stackoverflow.com/a/54964425/12514997
+    function formSubmit(event, endpoint) {
+        var url = "/update_avatar";
+        if (endpoint == "avatar") {
+            url = "/update_avatar";
+        } else {
+            url = "/update_bio";
+        }
+        var request = new XMLHttpRequest();
+        request.open('POST', url, true);
+        request.onreadystatechange = function() {
+            if (request.readyState == 4) {
+                if (request.status >= 200 && request.status <= 201) {
+                    if (endpoint=="avatar") {pfp.src = JSON.parse(request.response).url;};
+                } else {                                                                //funfact its actually not possible to receive anything but 201!! I know this because I wrote the server!!
+                    alert("Image failed to send to server. Status: " + request.status); //thats a blatant lie you can receive a 415, i know this because i wrote the server!!!!
+                }
+            }
+        };
+
+        request.onerror = function() {
+        // request failed
+            alert("Image failed to send to server. No more information available.");
+        };
+
+        if (event != undefined) { //We're reaching levels of spaghetti code that shouldn't be possible
+            request.send(new FormData(event.target)); // create FormData from form that triggered event
+            event.preventDefault();
+        } else {
+            let fd = new FormData();
+            fd.append("biography", document.getElementById("bio-modifier").value);
+            request.send(fd);
+        }
+        if (endpoint == "avatar") {
+            toggleAvatarForm();
+        }
+    }
+
 	function toggleAvatarForm() {
 		let p = document.getElementById("pfp-form-container");
 		if (p.style.display === "none") {
@@ -11,6 +50,32 @@
 			p.style.display = "none";
 		}
 	}
+	
+	function toggleBioModifier() {
+        let bm = document.getElementById("bio-modifier");
+        let bio = document.getElementById("bio-text");
+        let disp = bio.style.display;
+        if (disp === "none") {
+            bio.style.display = "inline-block";
+            bm.style.display = "none";
+        } else {
+            bio.style.display = "none";
+            bm.style.display = "inline-block";
+            bm.focus();
+        }
+    }
+	
+    function updateBio() { //validate and then POST if necessary (dont need to send a post if theres no change!)
+        let bm = document.getElementById("bio-modifier");
+        let bio = document.getElementById("bio-text");
+        if (bio.textContent != bm.value) {
+            console.log("HM!");
+            formSubmit(undefined, "bio");
+            bio.textContent = bm.value;
+        }
+        
+        toggleBioModifier();
+    }
 {{end}}
 
 function toggleModal(m) {
@@ -73,6 +138,8 @@ function changeSlide(gallery, direction) {
 
 	<div id="user-info">
 		<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
+		<span class="bio" id="bio-text"     {{if .SameUser}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</span>
+		{{if .SameUser}}<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>{{end}}
 		{{if .SameUser}}
 		<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
 		{{end}}
@@ -120,31 +187,10 @@ let pfp = document.getElementById("pfp");
 let pfpformc = document.getElementById("pfp-form-container");
 let pfpform = document.getElementById("pfp-form");
 
-//https://stackoverflow.com/a/54964425/12514997
-function formSubmit(event) {
-    var url = "/update_avatar";
-    var request = new XMLHttpRequest();
-    request.open('POST', url, true);
-    request.onreadystatechange = function() {
-        if (request.readyState == 4) {
-            if (request.status == 201) {
-                pfp.src = JSON.parse(request.response).url;
-            } else {                                                                //funfact its actually not possible to receive anything but 201!! I know this because I wrote the server!!
-                alert("Image failed to send to server. Status: " + request.status); //thats a blatant lie you can receive a 415, i know this because i wrote the server!!!!
-            }
-        }
-    };
 
-    request.onerror = function() {
-    // request failed
-        alert("Image failed to send to server. No more information available.");
-    };
+pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
 
-    request.send(new FormData(event.target)); // create FormData from form that triggered event
-    event.preventDefault();
-    toggleAvatarForm();
-}
-pfpform.addEventListener("submit", formSubmit);</script>
+</script>
 {{end}}
 <style>
 #body {
@@ -223,6 +269,20 @@ pfpform.addEventListener("submit", formSubmit);</script>
 	display: inline-block;
 	width: 500px;
 	margin: 0px;
+}
+
+.bio {
+    outline: dashed;
+    width: 25%;
+    display: inline-block;
+    position: absolute;
+    height: 40%;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+#bio-modifier {
+    resize: none;
 }
 </style>
 
