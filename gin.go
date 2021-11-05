@@ -77,7 +77,7 @@ func main() {
 	//PurgeLostMedia(db)
 
 	/* Prepared statements need only be used for queries you anticipate will be frequent.								*/
-	sqlINSERTuser, err := db.Prepare("INSERT INTO users VALUES(?, ?, ?, ?, ?, '')")
+	sqlINSERTuser, err := db.Prepare("INSERT INTO users(username, displayname, pass, avatar, bio) VALUES(?, ?, ?, '', '')")
 	if err != nil { log.Fatal(err) }
 	defer sqlINSERTuser.Close()
 	
@@ -163,7 +163,7 @@ func main() {
 				if err != nil { log.Panic(err) }
 				
 				//create user in db
-				_, err2 := sqlINSERTuser.Exec(nil, username, display_name, hash, nil)	//Exec does not return useful information related to the results of the query, therefore it is only appropriate for INSERT & UPDATE statements.
+				_, err2 := sqlINSERTuser.Exec(username, display_name, hash)	//Exec does not return useful information related to the results of the query, therefore it is only appropriate for INSERT & UPDATE statements.
 				if err2 != nil { log.Panic(err2) }
 				
 				c.Redirect(http.StatusSeeOther, "/")
@@ -386,7 +386,8 @@ func main() {
 		if err != nil {
 			if err == sql.ErrNoRows { 
 				c.String(404, "This profile doesn't exist")
-				c.Abort() 
+				c.Abort()
+				return
 			} else {
 				log.Fatal(err)
 			}
