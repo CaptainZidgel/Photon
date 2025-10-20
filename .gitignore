@@ -1,3 +1,5 @@
 conf.go
 tmp-img/
 reserved_names.csv
+go.sum
+.env

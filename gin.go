@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 	"fmt"
-	_ "os"
+	"os"
 	_ "bufio"
 	"bytes"
 	"strings"
-	_"strconv"
+	"strconv"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"database/sql"
@@ -25,6 +25,18 @@ import (
 	_ "golang.org/x/image/draw"
 	_ "mime/multipart"
 )
+
+type config struct {
+	DBun string
+	DBpass string
+	DBdb string
+	StoragePassReadOnly string
+	StoragePassWrite string
+	CSecret string
+	PassCost int
+}
+
+var Config config
 
 func AssembleDriverStr() string {
 	return fmt.Sprintf("%v:%v@/%v", Config.DBun, Config.DBpass, Config.DBdb)
@@ -62,7 +74,17 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 }
 
 func main() {
-    fmt.Println("Ready")
+	pcost, _ := strconv.Atoi(os.Getenv("PHOTON_PASSWORD_COST"))
+	Config = config{
+		DBun: os.Getenv("PHOTON_DB_USERNAME"),
+		DBpass: os.Getenv("PHOTON_DB_PASSWORD"),
+		DBdb: os.Getenv("PHOTON_DB"),
+		StoragePassReadOnly: os.Getenv("PHOTON_CDN_READ_ACCESS_KEY"),
+		StoragePassWrite: os.Getenv("PHOTON_CDN_WRITE_ACCESS_KEY"),
+		CSecret: os.Getenv("PHOTON_COOKIE_SECRET"),
+		PassCost: pcost, //bcrypt
+	}
+
     reserved_unames := ReservedNames("reserved_names.csv")
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -492,6 +514,7 @@ func main() {
 	    return
 	})
 
+	fmt.Println("Serving on 0.0.0.0:8080")
 	rout.Run()
 }
 

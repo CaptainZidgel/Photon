@@ -8,7 +8,7 @@ import (
     "os"
     "io"
     "encoding/csv"
-    "log"
+    "fmt"
 )
 
 //https://www.cloudhadoop.com/2018/12/go-example-program-to-check-string_13.html
@@ -51,39 +51,30 @@ func NowDateString() string {
     return ts
 }
 
-
-func ReadCSV(fpath string) []string {
-    f, err := os.Open(fpath)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer f.Close()
-    
-    var names []string
-    rows := csv.NewReader(f)
-    for {
-        record, err := rows.Read()
-        if err == io.EOF {
-            break
-        }
-        if err != nil {
-            log.Fatal(err)
-        }
-        names = append(names, record[0])
-    }
-    return names
-}
-
-func ReservedSet(arr []string) map[string]bool {
-    names := make(map[string]bool)
-    for _, v := range arr {
-        names[v] = true
-    }
-    return names
-}
-
+//take a CSV File of names, turn into a set.
 func ReservedNames(fpath string) map[string]bool {
-    var arr []string = ReadCSV(fpath)
-    return ReservedSet(arr)
+	names := make(map[string]bool)
+	f, err := os.Open(fpath)
+	if err != nil { //file probably doesn't exist
+		if !os.IsNotExist(err) {
+			fmt.Printf("Error opening reserved names file, %v\n", err)
+		}
+		return names
+	}
+	defer f.Close()
+
+	rows := csv.NewReader(f)
+	for {
+		record, err := rows.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			fmt.Printf("Error reading CSV file, %v\n", err)
+		}
+		names[record[0]] = true
+	}
+
+	return names
 }
 
