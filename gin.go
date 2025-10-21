@@ -4,6 +4,7 @@ import (
 	_ "bufio"
 	"bytes"
 	"database/sql"
+	"errors"
 	"fmt"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
@@ -45,7 +46,7 @@ func AssembleDriverStr() string {
 var reserved_unames_arr []string = []string{"a", "b"}
 
 type User struct { // &user.id, &user.Username, &user.Displayname, &user.Avatar
-    id          int
+	id          int
 	Username    string
 	Displayname string
 	Avatar      string
@@ -180,7 +181,7 @@ func main() {
 			cleanUN := nfkd(username)
 
 			if reserved_unames[username] || !VerifyUsername(username) {
-				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is not permitted", "registration": true})
+				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"error": "This username is not permitted", "registration": true})
 				return
 			}
 
@@ -190,7 +191,7 @@ func main() {
 				if notok != nil {
 					log.Fatal(notok)
 				}
-				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": "This username is already taken", "registration": true})
+				c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"error": "This username is already taken", "registration": true})
 				return
 			} else { //error IS "no rows found"
 				display_name := c.DefaultPostForm("display", username)
@@ -198,7 +199,7 @@ func main() {
 
 				err := VerifyPasswordBasic(true, c.PostForm("password"), c.PostForm("conf_password"), "")
 				if err != nil {
-					c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"Error": err.Error(), "username": username})
+					c.HTML(http.StatusForbidden, "register.tmpl", gin.H{"error": err.Error(), "username": username, "registration": true})
 					return
 				}
 				passw := []byte(c.PostForm("password"))
@@ -236,9 +237,15 @@ func main() {
 		var tempPass string
 		sqlSELECTuserPASS.QueryRow(un).Scan(&tempPass)
 		err := bcrypt.CompareHashAndPassword([]byte(tempPass), []byte(p))
+		var errtxt string
 		if err != nil {
-			//c.Redirect(401, "BAD PASSWORD")	//THIS NEEDS TO BE FIXEd
-			c.AbortWithStatus(401) //THIS DOESNT STOP THIS THREAD
+			if errors.Is(err, bcrypt.ErrHashTooShort) {
+				errtxt = "Server failed authentication, try again later"
+				log.Println("WARNING - Password authentication attempted to check an invalid hash")
+			} else {
+				errtxt = "Authentication failed (username or password not recognized)"
+			}
+			c.HTML(401, "register.tmpl", gin.H{"error": errtxt})
 			return
 		}
 		session.Set("username", un)

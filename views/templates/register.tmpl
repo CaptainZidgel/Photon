@@ -8,6 +8,7 @@
 		Username <input type="text" name="username" {{if .username}}value="{{.username}}"{{end}}><br>
 		Password <input type="password" name="password"><br>
 		{{if .registration}} Confirm Password <input type="password" name="conf_password"><br>{{end}}
+        {{if .error}}<div class="error">{{.error}}</div> {{end}}
 		<input type="submit">
 	</form>
 {{end}}
@@ -16,5 +17,17 @@
 	#body {
 		margin: 15px;
 	}
+    .error {
+        background-color: #ffebee;
+        border: 2px solid #f44336;
+        color: #c62828;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 4px;
+        font-size: 16px;
+        font-weight: bold;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(244, 67, 54, 0.2);
+    }
 </style>
 {{end}}
