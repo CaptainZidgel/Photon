@@ -90,6 +90,7 @@ function toggleModal(m) {
 function slides(gallery, slide) {
 	let i;
 	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`)
+	let infoElements = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide-info`)
 	if (slide < 0) {
 		slide = x.length - 1;
 	} else if (slide > x.length - 1) {
@@ -97,8 +98,14 @@ function slides(gallery, slide) {
 	}
 	for (let i = 0; i < x.length; i++) {
 		x[i].style.display = "none";
+		if (infoElements[i]) {
+			infoElements[i].style.display = "none";
+		}
 	}
 	x[slide].style.display = "inline";
+	if (infoElements[slide]) {
+		infoElements[slide].style.display = "block";
+	}
 }
 
 window.onclick = function(event) {
@@ -154,28 +161,42 @@ function changeSlide(gallery, direction) {
 					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}})"> <!-- alt="{{$g.Id}}" no alt at the moment, want a clickable image, ideally I'd like to make images NEVER break :D-->
 				</div>
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
-					<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div><div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
-					<div class="infobox gal-info">
-						<span class="description">
-						    {{ $g.Description }}
-						</span>
-						<span class="gallery-upload-stamp">
-						    {{ $g.Uploaded }}
-						</span>
+					<div class="closeModal" onclick="toggleModal({{$gi}})">X</div>
+					<div class="lightbox-content">
+						<div class="photo-container">
+							{{range $pi, $p := $g.Photos}}
+								<span class="slide" id="slide-{{$gi}}:{{$pi}}">
+									<img src="{{ $p.Reference }}" class="photo">
+								</span>
+							{{end}}
+						</div>
+						<div class="lightbox-sidebar">
+							<div class="navigation-controls">
+								<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div>
+								<div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
+							</div>
+							<div class="infobox gal-info">
+								<span class="description">
+								    {{ $g.Description }}
+								</span>
+								<span class="gallery-upload-stamp">
+								    {{ $g.Uploaded }}
+								</span>
+							</div>
+							{{range $pi, $p := $g.Photos}}
+								<div class="slide-info" id="info-{{$gi}}:{{$pi}}" style="display: none;">
+									<table class="infobox img-exif">
+										{{range $k, $v := $p.Exif}}
+										<tr>
+											<td>{{$k}}</td>
+											<td>{{$v}}<td>
+										</tr>
+										{{end}}
+									</table>
+								</div>
+							{{end}}
+						</div>
 					</div>
-					{{range $pi, $p := $g.Photos}}
-						<span class="slide" id="slide-{{$gi}}:{{$pi}}">
-							<img src="{{ $p.Reference }}" class="photo">
-							<table class="infobox img-exif">
-								{{range $k, $v := $p.Exif}}
-								<tr>
-									<td>{{$k}}</td>
-									<td>{{$v}}<td>
-								</tr>
-								{{end}}
-							</table>
-						</span>
-					{{end}}	
 				</div>
 			{{end}}
 		{{end}}
@@ -221,16 +242,56 @@ pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
 	height: 100%;
 	left: 0;
 	top: 0;
-	text-align: center;
 	background-color: rgb(0, 0, 0, 0.8);
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
-.lbox img {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 100%;
-  max-height: 100%;
+.lightbox-content {
+	display: flex;
+	width: 90%;
+	height: 100vh;
+	max-width: 1200px;
+	background-color: white;
+	border-radius: 8px;
+	overflow: hidden;
+	margin: auto;
+}
+
+.photo-container {
+	flex: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: #f5f5f5;
+	position: relative;
+	height: 100vh;
+}
+
+.photo-container img {
+	max-width: 100%;
+	height: 100vh;
+	object-fit: contain;
+}
+
+.lightbox-sidebar {
+	width: 300px;
+	background-color: white;
+	padding: 20px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+	height: 100vh;
+	word-wrap: break-word;
+}
+
+.navigation-controls {
+	display: flex;
+	gap: 10px;
+	justify-content: center;
 }
 
 #pfp-form-container {
@@ -238,37 +299,53 @@ pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
     height: 25px;
 }
 
+.closeModal {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	color: white;
+	background-color: #4a4a4a;
+	padding: 10px 15px;
+	border-radius: 4px;
+	cursor: pointer;
+	z-index: 10;
+}
+
+.closeModal:hover {
+	background-color: #2a2a2a;
+}
+
 .prev, .next {
 	color: white;
-	display: inline;
-	background-color: black;
-	margin-top: 25%;
+	background-color: #4a4a4a;
+	padding: 10px 15px;
+	border-radius: 4px;
+	cursor: pointer;
+	text-align: center;
+	flex: 1;
+}
+
+.prev:hover, .next:hover {
+	background-color: #2a2a2a;
 }
 
 #img-grid {
 	max-width: 90rem;
-	display: table;
-	height: auto;
-	outline: auto;
 	display: flex;
 	flex-wrap: wrap;
-	margin-bottom: 3rem;
-	margin-left: auto;
-	margin-right: auto;
+	margin: 0 auto 3rem;
+	outline: auto;
 }
 
 #user-info {
-	margin-left: auto;
-	margin-right: auto;
-	margin-bottom: 3rem;
+	margin: 0 auto 3rem;
 	width: 60rem;
 }
 
 .infobox {
 	background-color: gray;
 	display: inline-block;
-	width: 500px;
-	margin: 0px;
+	width: 300px;
 }
 
 .bio {
