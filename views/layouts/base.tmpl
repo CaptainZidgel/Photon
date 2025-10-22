@@ -4,10 +4,34 @@
 	{{if .myUser}}
 	<span id="self-ref">Hi, <a href="/p/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
 	<span id="logio"><a href="/logout">Logout</a></span>
+	<span id="upload" onclick="toggleUpload()">Upload to Photon</span>
+	<div id="UPLOAD-CONTAINER" style="display: none">
+		<form action="/upload" method="POST" enctype="multipart/form-data">
+			<input type="file" name="files" accept="image/*" multiple><br>
+			<textarea name="desc" rows="25" cols="50">
+	My photo!
+
+	License: MY-LICENSE
+			</textarea><br>
+
+			<input id="tags" name="tags" placeholder="Up to 3 comma separated tags"></input><br>
+
+			<input type="submit" value="Upload your photo!"><br>
+		</form>
+	</div>
 	{{else}}
 	<span id="logio"><a href="/login">Login</a></span>
 	{{end}}
 </div>
+<script>
+	function toggleUpload() {
+		if (document.getElementById("UPLOAD-CONTAINER").style.display === "none") {
+			document.getElementById("UPLOAD-CONTAINER").style.display = "block";
+		} else {
+			document.getElementById("UPLOAD-CONTAINER").style.display = "none";
+		}
+	}
+</script>
 {{if .Error}}<p class="err">{{.Error}}</p>{{end}}
 {{template "content" . }}
 </body>
