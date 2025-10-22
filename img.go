@@ -154,11 +154,6 @@ func InsertPhotoIntoDatabase(db *sql.DB, photo Photo) int64 {
 	r, e := db.Exec("INSERT INTO photos(ref, gallery_id, datetaken, fstop, iso, model, lens) VALUES(?, ?, ?, ?, ?, ?, ?)",
 		photo.Reference,
 		photo.Gallery_id,
-		/*photo.Exif["Date Taken"],
-		photo.Exif["F-Stop"],
-		photo.Exif["ISO"],
-		photo.Exif["Model"],
-		photo.Exif["Lens"],*/
 		photo.Datetaken,
 		photo.Fstop,
 		photo.ISO,
@@ -260,8 +255,11 @@ func PopulateGallery(stmt *sql.Stmt, gallery *Gallery) { //("SELECT * FROM photo
 		if err := rows.Scan(&photo.Reference, &photo.Id, &photo.Gallery_id, &photo.Datetaken, &photo.Fstop, &photo.ISO, &photo.Model, &photo.Lens); err != nil {
 			panic(err)
 		}
-		if !strings.HasPrefix(photo.Reference, "http") {
-			photo.Reference = StorageZoneRead + photo.Reference //not efficient at large scale but i dont think this is large scale to care about that?
+		//photo.Reference is already set, now we check if we need to prepend the CDN URL
+		//if begins with http, let it chill... it probably begins with the CDN URL
+		//if begins with /home/, I'm running a local test with local file references
+		if !(strings.HasPrefix(photo.Reference, "http") || strings.HasPrefix(photo.Reference, "/home/")) {
+			photo.Reference = StorageZoneRead + photo.Reference
 		}
 		photo.Exif = ExifFromStruct(photo)
 		photos = append(photos, photo)

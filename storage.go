@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,7 +62,10 @@ func UploadToCDN(file io.Reader, path string) error {
 	}
 
 	if status != 201 {
-		return errors.New("Undesired status code during upload: " + string(status))
+		if status == 401 {
+			return errors.New("Authentication to CDN failed") //API Key is wrong
+		}
+		return errors.New("Undesired status code during upload: " + strconv.Itoa(status))
 	}
 
 	//_, status, err :=

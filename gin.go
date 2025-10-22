@@ -108,7 +108,7 @@ func main() {
 	}
 	defer sqlINSERTuser.Close()
 
-	sqlSELECTuserID, err := db.Prepare("SELECT * FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
+	sqlSELECTuserID, err := db.Prepare("SELECT user_id, username, displayname, avatar, bio FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func main() {
 	}
 	defer sqlSELECTuserPASS.Close()
 
-	sqlSELECTphotos, err := db.Prepare("SELECT * FROM photos WHERE gallery_id = ?")
+	sqlSELECTphotos, err := db.Prepare("SELECT ref, photo_id, gallery_id, datetaken, fstop, iso, model, lens FROM photos WHERE gallery_id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -344,8 +344,6 @@ func main() {
 		gal_descrip := c.PostForm("desc")
 		gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
 		gid := int(gal.Id)
-		/*the creation of a new gallery based on an upload, before you make sure all the photos are legit and the upload will succeed, will
-		mean that canceled/errored uploads will create nonconsecutive gallery ids, but this is acceptable and even desirable*/
 
 		uploaded_gallery, ug_err := c.MultipartForm()
 		if ug_err != nil {
