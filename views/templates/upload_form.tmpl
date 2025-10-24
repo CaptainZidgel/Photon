@@ -1,16 +1,3 @@
 {{define "content"}}
-<div id="UPLOAD-CONTAINER">
-	<form action="/upload" method="POST" enctype="multipart/form-data">
-		<input type="file" name="files" accept="image/*" multiple><br>
-		<textarea name="desc" rows="25" cols="50">
-My photo!
 
-License: MY-LICENSE
-		</textarea><br>
-
-		<input id="tags" name="tags" placeholder="Up to 3 comma separated tags"></input><br>
-
-		<input type="submit" value="Upload your photo!"><br>
-	</form>
-</div>
 {{end}}
