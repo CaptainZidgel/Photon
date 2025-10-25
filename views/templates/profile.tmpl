@@ -1,7 +1,9 @@
 <!--Sneaky HTML comment to persuade my text editor to highlight as HTML-->
 {{define "content"}}
-<head><title>{{.User.Username}}</title></head>
-<script type="text/javascript">
+<head>
+<script src=" https://cdn.jsdelivr.net/npm/macy@2.5.1/dist/macy.min.js "></script>
+<title>{{.User.Username}}</title>
+<script type="text/javascript" defer>
 
 {{if .SameUser}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
     //https://stackoverflow.com/a/54964425/12514997
@@ -50,7 +52,7 @@
 			p.style.display = "none";
 		}
 	}
-	
+
 	function toggleBioModifier() {
         let bm = document.getElementById("bio-modifier");
         let bio = document.getElementById("bio-text");
@@ -64,7 +66,7 @@
             bm.focus();
         }
     }
-	
+
     function updateBio() { //validate and then POST if necessary (dont need to send a post if theres no change!)
         let bm = document.getElementById("bio-modifier");
         let bio = document.getElementById("bio-text");
@@ -73,7 +75,7 @@
             formSubmit(undefined, "bio");
             bio.textContent = bm.value;
         }
-        
+
         toggleBioModifier();
     }
 {{end}}
@@ -131,7 +133,9 @@ function changeSlide(gallery, direction) {
 		}
 	}
 }
+
 </script>
+</head>
 
 <div id="body">
 	{{if .SameUser}}
@@ -146,20 +150,18 @@ function changeSlide(gallery, direction) {
 	<div id="user-info">
 		<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
 		<span class="bio" id="bio-text"     {{if .SameUser}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</span>
-		{{if .SameUser}}<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>{{end}}
 		{{if .SameUser}}
-		<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
+			<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>
+			<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
 		{{end}}
 		<strong>{{.User.Displayname}}</strong><br>
 		@{{.User.Username}}
 	</div>
-	
-	<div id="img-grid">
+
+	<div id="macy-container">
 		{{range $gi, $g := .Galleries}}
 			{{if $g.Photos}}
-				<div class="gallery-thumb">
-					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}})"> <!-- alt="{{$g.Id}}" no alt at the moment, want a clickable image, ideally I'd like to make images NEVER break :D-->
-				</div>
+					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}})" class="gallery-thumb">
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
 					<div class="closeModal" onclick="toggleModal({{$gi}})">X</div>
 					<div class="lightbox-content">
@@ -171,10 +173,12 @@ function changeSlide(gallery, direction) {
 							{{end}}
 						</div>
 						<div class="lightbox-sidebar">
+							{{if (gt (len $g.Photos) 1)}}
 							<div class="navigation-controls">
 								<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div>
 								<div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
 							</div>
+							{{end}}
 							<div class="infobox gal-info">
 								<span class="description">
 								    {{ $g.Description }}
@@ -203,15 +207,15 @@ function changeSlide(gallery, direction) {
 	</div>
 </div>
 {{if .SameUser }}
-<script>
-let pfp = document.getElementById("pfp");
-let pfpformc = document.getElementById("pfp-form-container");
-let pfpform = document.getElementById("pfp-form");
+	<script>
+	let pfp = document.getElementById("pfp");
+	let pfpformc = document.getElementById("pfp-form-container");
+	let pfpform = document.getElementById("pfp-form");
 
 
-pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
+	pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
 
-</script>
+	</script>
 {{end}}
 <style>
 #body {
@@ -369,5 +373,16 @@ pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
     resize: none;
 }
 </style>
-
+<script>
+	macy = Macy({
+		container: "#macy-container",
+		trueOrder: true,
+		waitForImages: true,
+		columns: 3,
+		margin: {
+			x: 0,
+			y: 20,
+		},
+	})
+</script>
 {{end}}
