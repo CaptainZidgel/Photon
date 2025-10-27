@@ -1,156 +1,36 @@
 <!--Sneaky HTML comment to persuade my text editor to highlight as HTML-->
 {{define "content"}}
+{{$SU := .SameUser}}
 <head>
 <script src=" https://cdn.jsdelivr.net/npm/macy@2.5.1/dist/macy.min.js "></script>
 <title>{{.User.Username}}</title>
-<script type="text/javascript" defer>
-
-{{if .SameUser}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
-    //https://stackoverflow.com/a/54964425/12514997
-    function formSubmit(event, endpoint) {
-        var url = "/update_avatar";
-        if (endpoint == "avatar") {
-            url = "/update_avatar";
-        } else {
-            url = "/update_bio";
-        }
-        var request = new XMLHttpRequest();
-        request.open('POST', url, true);
-        request.onreadystatechange = function() {
-            if (request.readyState == 4) {
-                if (request.status >= 200 && request.status <= 201) {
-                    if (endpoint=="avatar") {pfp.src = JSON.parse(request.response).url;};
-                } else {                                                                //funfact its actually not possible to receive anything but 201!! I know this because I wrote the server!!
-                    alert("Image failed to send to server. Status: " + request.status); //thats a blatant lie you can receive a 415, i know this because i wrote the server!!!!
-                }
-            }
-        };
-
-        request.onerror = function() {
-        // request failed
-            alert("Image failed to send to server. No more information available.");
-        };
-
-        if (event != undefined) { //We're reaching levels of spaghetti code that shouldn't be possible
-            request.send(new FormData(event.target)); // create FormData from form that triggered event
-            event.preventDefault();
-        } else {
-            let fd = new FormData();
-            fd.append("biography", document.getElementById("bio-modifier").value);
-            request.send(fd);
-        }
-        if (endpoint == "avatar") {
-            toggleAvatarForm();
-        }
-    }
-
-	function toggleAvatarForm() {
-		let p = document.getElementById("pfp-form-container");
-		if (p.style.display === "none") {
-			p.style.display = "block";
-		} else {
-			p.style.display = "none";
-		}
-	}
-
-	function toggleBioModifier() {
-        let bm = document.getElementById("bio-modifier");
-        let bio = document.getElementById("bio-text");
-        let disp = bio.style.display;
-        if (disp === "none") {
-            bio.style.display = "inline-block";
-            bm.style.display = "none";
-        } else {
-            bio.style.display = "none";
-            bm.style.display = "inline-block";
-            bm.focus();
-        }
-    }
-
-    function updateBio() { //validate and then POST if necessary (dont need to send a post if theres no change!)
-        let bm = document.getElementById("bio-modifier");
-        let bio = document.getElementById("bio-text");
-        if (bio.textContent != bm.value) {
-            console.log("HM!");
-            formSubmit(undefined, "bio");
-            bio.textContent = bm.value;
-        }
-
-        toggleBioModifier();
-    }
-{{end}}
-
-function toggleModal(m) {
-	slides(m, 0);
-	if (document.getElementById("lbox-"+m).style.display === "none") {
-		document.getElementById("lbox-"+m).style.display = "block";
-	} else {
-		document.getElementById("lbox-"+m).style.display = "none";
-	}
-}
-
-function slides(gallery, slide) {
-	let i;
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`)
-	let infoElements = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide-info`)
-	if (slide < 0) {
-		slide = x.length - 1;
-	} else if (slide > x.length - 1) {
-		slide = 0;
-	}
-	for (let i = 0; i < x.length; i++) {
-		x[i].style.display = "none";
-		if (infoElements[i]) {
-			infoElements[i].style.display = "none";
-		}
-	}
-	x[slide].style.display = "inline";
-	if (infoElements[slide]) {
-		infoElements[slide].style.display = "block";
-	}
-}
-
-window.onclick = function(event) {
-	let cname = event.target.className;
-	let id = event.target.id;
-	if (cname == "lbox" && id != "pfp-form-container") {
-		let n = id.match(/lbox-(\d+)/)[1];
-		toggleModal(n);
-	}
-	{{if .SameUser}}
-	if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
-		toggleAvatarForm();
-	}
-	{{end}}
-}
-
-function changeSlide(gallery, direction) {
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`);
-	for (let i = 0; i < x.length; i++) {
-		if (x[i].style.display != "none") {
-			slides(gallery, i + direction);
-			return;
-		}
-	}
-}
-
-</script>
 </head>
 
 <div id="body">
-	{{if .SameUser}}
+	{{if $SU}}
 	<div id="pfp-form-container" class="lbox" style="display: none;"> <!--I don't know if reusing lbox here is a good idea but I'm doing it anyway-->
 		<form id="pfp-form" action="/update_avatar" method="post" enctype="multipart/form-data">
 		    <input type="file" name="pfp" accept="image/*">
 			<input type="submit">
 		</form>
 	</div>
+
+	<dialog id="delete-dialog">
+		<form method="dialog">
+			<p>You will permanently delete this gallery and its images FOREVER!!!!!!!!!!!!!!</p>
+			<div>
+				<button value="cancel">Wait, keep it!</button>
+				<button value="confirm">Burninate it!</button>
+				<input id="delete-gallery-id" type="hidden" name="gallery-id" value=""/>
+			</div>
+		</form>
+	</dialog>
 	{{end}}
 
 	<div id="user-info">
 		<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
-		<span class="bio" id="bio-text"     {{if .SameUser}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</span>
-		{{if .SameUser}}
+		<span class="bio" id="bio-text"     {{if $SU}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</span>
+		{{if $SU}}
 			<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>
 			<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
 		{{end}}
@@ -161,9 +41,10 @@ function changeSlide(gallery, direction) {
 	<div id="macy-container">
 		{{range $gi, $g := .Galleries}}
 			{{if $g.Photos}}
-					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}})" class="gallery-thumb">
+					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}}, {{$g.Id}})" class="gallery-thumb">
 				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
 					<div class="closeModal" onclick="toggleModal({{$gi}})">X</div>
+		  {{if $SU}}<div class="deleteGallery">Delete This Gallery?</div>{{end}}
 					<div class="lightbox-content">
 						<div class="photo-container">
 							{{range $pi, $p := $g.Photos}}
@@ -206,17 +87,6 @@ function changeSlide(gallery, direction) {
 		{{end}}
 	</div>
 </div>
-{{if .SameUser }}
-	<script>
-	let pfp = document.getElementById("pfp");
-	let pfpformc = document.getElementById("pfp-form-container");
-	let pfpform = document.getElementById("pfp-form");
-
-
-	pfpform.addEventListener("submit", (event) => {formSubmit(event, "avatar")});
-
-	</script>
-{{end}}
 <style>
 #body {
 	margin-left: auto;
@@ -326,6 +196,22 @@ function changeSlide(gallery, direction) {
 	background-color: #2a2a2a;
 }
 
+.deleteGallery {
+	position: absolute;
+	bottom: 10px;
+	right: 10px;
+	color: white;
+	background-color: #4a4a4a;
+	padding: 10px 15px;
+	border-radius: 4px;
+	cursor: pointer;
+	z-index: 10;
+}
+
+.deleteGallery:hover {
+	background-color: #2a2a2a;
+}
+
 .prev, .next {
 	color: white;
 	background-color: #4a4a4a;
@@ -372,7 +258,167 @@ function changeSlide(gallery, direction) {
 #bio-modifier {
     resize: none;
 }
+
+#delete-gallery {
+}
 </style>
+<script type="text/javascript" defer>
+{{if $SU}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
+    //https://stackoverflow.com/a/54964425/12514997
+    function formSubmit(sourceForm, endpoint) {
+        var url = "";
+        if (endpoint == "avatar") {
+            url = "/update_avatar";
+        } else if (endpoint == "bio") {
+            url = "/update_bio";
+        } else if (endpoint == "deleteGal") {
+			url = "/delete_gal";
+        }
+        var request = new XMLHttpRequest();
+        request.open('POST', url, true);
+        request.onreadystatechange = function() {
+            if (request.readyState == 4) {
+                if (request.status >= 200 && request.status <= 201) {
+                    if (endpoint=="avatar") {pfp.src = JSON.parse(request.response).url;};
+                } else {                                                                //funfact its actually not possible to receive anything but 201!! I know this because I wrote the server!!
+                    alert("Image failed to send to server. Status: " + request.status); //thats a blatant lie you can receive a 415, i know this because i wrote the server!!!!
+                }
+            }
+        };
+
+        request.onerror = function() {
+        // request failed
+            alert("Image failed to send to server. No more information available.");
+        };
+
+        if (sourceForm != undefined) {
+			let fd = new FormData(sourceForm); // create FormData using values from a <form> identified by sourceForm
+			console.log(fd);
+			request.send(fd);
+        } else {
+            let fd = new FormData();
+            fd.append("biography", document.getElementById("bio-modifier").value);
+            request.send(fd);
+        }
+        if (endpoint == "avatar") {
+            toggleAvatarForm();
+        }
+    }
+
+	function toggleAvatarForm() {
+		let p = document.getElementById("pfp-form-container");
+		if (p.style.display === "none") {
+			p.style.display = "block";
+		} else {
+			p.style.display = "none";
+		}
+	}
+
+	function toggleBioModifier() {
+        let bm = document.getElementById("bio-modifier");
+        let bio = document.getElementById("bio-text");
+        let disp = bio.style.display;
+        if (disp === "none") {
+            bio.style.display = "inline-block";
+            bm.style.display = "none";
+        } else {
+            bio.style.display = "none";
+            bm.style.display = "inline-block";
+            bm.focus();
+        }
+    }
+
+    function updateBio() { //validate and then POST if necessary (dont need to send a post if theres no change!)
+        let bm = document.getElementById("bio-modifier");
+        let bio = document.getElementById("bio-text");
+        if (bio.textContent != bm.value) {
+            console.log("HM!");
+            formSubmit(undefined, "bio");
+            bio.textContent = bm.value;
+        }
+
+        toggleBioModifier();
+    }
+
+	let pfp = document.getElementById("pfp");
+	let pfpformc = document.getElementById("pfp-form-container");
+	let pfpform = document.getElementById("pfp-form");
+
+	pfpform.addEventListener("submit", (event) => {
+		event.preventDefault();
+		formSubmit(event.target, "avatar");
+	});
+
+	let deleteDialog = document.getElementById("delete-dialog");
+
+	deleteDialog.addEventListener("close", (e) => {
+		if (deleteDialog.returnValue === "confirm") {
+			formSubmit(deleteDialog.children[0], "deleteGal");
+		}
+	})
+{{end}}
+
+function toggleModal(modal_id, gallery_id) {
+	slides(modal_id, 0);
+	if (document.getElementById("lbox-"+modal_id).style.display === "none") {
+		document.getElementById("lbox-"+modal_id).style.display = "block";
+		if (gallery_id) {document.getElementById("delete-gallery-id").value = gallery_id;}
+	} else {
+		document.getElementById("lbox-"+modal_id).style.display = "none";
+	}
+}
+
+function slides(gallery, slide) {
+	let i;
+	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`)
+	let infoElements = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide-info`)
+	if (slide < 0) {
+		slide = x.length - 1;
+	} else if (slide > x.length - 1) {
+		slide = 0;
+	}
+	for (let i = 0; i < x.length; i++) {
+		x[i].style.display = "none";
+		if (infoElements[i]) {
+			infoElements[i].style.display = "none";
+		}
+	}
+	x[slide].style.display = "inline";
+	if (infoElements[slide]) {
+		infoElements[slide].style.display = "block";
+	}
+}
+
+window.onclick = function(event) {
+	let cname = event.target.className;
+	let id = event.target.id;
+	console.log(cname, id);
+	if (cname == "lbox" && id != "pfp-form-container") {
+		event.preventDefault();
+		let n = id.match(/lbox-(\d+)/)[1];
+		toggleModal(n);
+	}
+	{{if $SU}}
+	if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
+		toggleAvatarForm();
+	}
+	if (cname == "deleteGallery") {
+		let n = event.target.parentElement.id.match(/lbox-(\d+)/)[1];
+		deleteDialog.showModal();
+	}
+	{{end}}
+}
+
+function changeSlide(gallery, direction) {
+	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`);
+	for (let i = 0; i < x.length; i++) {
+		if (x[i].style.display != "none") {
+			slides(gallery, i + direction);
+			return;
+		}
+	}
+}
+</script>
 <script>
 	macy = Macy({
 		container: "#macy-container",

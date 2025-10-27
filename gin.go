@@ -138,6 +138,12 @@ func main() {
 	}
 	defer sqlSELECTgals.Close()
 
+	sqlDELETEgals, err := db.Prepare("DELETE FROM galleries WHERE gallery_id = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer sqlDELETEgals.Close()
+
 	sqlUPDATEuserPASS, err := db.Prepare("UPDATE users SET pass = ? WHERE username = ?") //replace the password hash for this username : sqlUPDATEuserPASS.Exec(newhash, username)
 	if err != nil {
 		log.Fatal(err)
@@ -470,6 +476,26 @@ func main() {
 	rout.GET("/other/:o", func(c *gin.Context) {
 		o := c.Param("o")
 		c.String(200, nfkd(o))
+	})
+
+	rout.POST("/delete_gal", func(c *gin.Context) {
+		myUserI, _ := c.Get("myUser")
+		if myUserI == nil {
+			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to delete this gallery"})
+			return
+		}
+		//var myUser User = myUserI.(User)
+
+		id := c.PostForm("gallery-id")
+		log.Printf("Received gallery deletion request, ID %v\n", id)
+		res, err := sqlDELETEgals.Exec(id) //res has methods LastInsertId() or RowsAffected().
+		if err != nil {
+			panic(err)
+		}
+		rows, _ := res.RowsAffected()
+		if rows != 1 {
+			fmt.Println("BRUH!!!", rows)
+		}
 	})
 
 	rout.POST("/update_avatar", func(c *gin.Context) {
