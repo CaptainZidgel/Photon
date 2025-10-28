@@ -4,8 +4,8 @@ import (
 	_ "bufio"
 	"bytes"
 	"database/sql"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
@@ -139,7 +139,7 @@ func main() {
 	}
 	defer sqlSELECTgals.Close()
 
-	sqlDELETEgals, err := db.Prepare("DELETE FROM galleries WHERE gallery_id = ?")
+	sqlDELETEgals, err := db.Prepare("DELETE FROM galleries WHERE gallery_id = ? AND owner_id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -489,23 +489,25 @@ func main() {
 			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to delete this gallery"})
 			return
 		}
-		//var myUser User = myUserI.(User)
+		var myUser User = myUserI.(User)
 
-		id := c.PostForm("gallery-id")
-		log.Printf("Received gallery deletion request, ID %v\n", id)
-		res, err := sqlDELETEgals.Exec(id) //res has methods LastInsertId() or RowsAffected().
+		gid := c.PostForm("gallery-id")
+		log.Printf("Received gallery deletion request, ID %v\n", gid)
+		res, err := sqlDELETEgals.Exec(gid, myUser.id) //res has methods LastInsertId() or RowsAffected().
 		if err != nil {
 			panic(err)
 			c.String(500, "Error deleting gal")
 			c.Abort()
+			return
 		}
 		rows, _ := res.RowsAffected()
 		if rows != 1 {
 			fmt.Println("BRUH!!!", rows)
 			c.String(500, "Error deleting gal2")
 			c.Abort()
+			return
 		}
-		c.String(201, "OK")
+		c.String(200, "OK")
 		return
 	})
 
