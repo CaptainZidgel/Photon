@@ -6,7 +6,7 @@
 	<span id="logio"><a href="/logout">Logout</a></span>
 	<span id="upload" onclick="toggleUpload()">Upload to Photon</span>
 	<div id="UPLOAD-CONTAINER" style="display: none">
-		<form action="/upload" method="POST" enctype="multipart/form-data">
+		<form action="/upload" id="upload-form" method="POST" enctype="multipart/form-data">
 			<input type="file" name="files" accept="image/*" multiple><br>
 			<textarea name="desc" rows="25" cols="50">
 	My photo!
@@ -16,7 +16,7 @@
 
 			<input id="tags" name="tags" placeholder="Up to 3 comma separated tags"></input><br>
 
-			<input type="submit" value="Upload your photo!"><br>
+			<input id="upload-submit" type="submit" value="Upload your photo!"><br>
 		</form>
 	</div>
 	{{else}}
@@ -31,6 +31,28 @@
 			document.getElementById("UPLOAD-CONTAINER").style.display = "none";
 		}
 	}
+
+	function uploadReq() {
+		let request = new XMLHttpRequest();
+        request.open('POST', "/upload", true);
+        //request.setRequestHeader("Content-Type", "multipart/form-data; boundary=imgboundary&")
+        request.onreadystatechange = function() {
+            if (request.readyState == 4) {
+                if (request.status >= 200 && request.status <= 201) {
+					uploadForm.reset();
+                } else {
+                    alert("Message failed to send to server. Status: " + request.status);
+                }
+            }
+        }
+        request.send(new FormData(uploadForm));
+	}
+
+	let uploadForm = document.getElementById("upload-form");
+	uploadForm.addEventListener("submit", (e) => {
+		e.preventDefault();
+		uploadReq(uploadForm);
+	})
 </script>
 {{if .Error}}<p class="err">{{.Error}}</p>{{end}}
 {{template "content" . }}

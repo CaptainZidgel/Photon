@@ -349,8 +349,6 @@ func main() {
 		myUser = myUserI.(User)
 
 		gal_descrip := c.PostForm("desc")
-		gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
-		gid := int(gal.Id)
 
 		uploaded_gallery, ug_err := c.MultipartForm()
 		if ug_err != nil {
@@ -358,7 +356,8 @@ func main() {
 			return
 		}
 		photos := uploaded_gallery.File["files"] //get the parameter named "files" from the form
-
+		gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
+		gid := int(gal.Id)
 		for p_index, photoheader := range photos {
 			file, err := photoheader.Open() //get associated file for parameter (type: File)
 			if err != nil {
@@ -497,11 +496,17 @@ func main() {
 		res, err := sqlDELETEgals.Exec(id) //res has methods LastInsertId() or RowsAffected().
 		if err != nil {
 			panic(err)
+			c.String(500, "Error deleting gal")
+			c.Abort()
 		}
 		rows, _ := res.RowsAffected()
 		if rows != 1 {
 			fmt.Println("BRUH!!!", rows)
+			c.String(500, "Error deleting gal2")
+			c.Abort()
 		}
+		c.String(201, "OK")
+		return
 	})
 
 	rout.POST("/update_avatar", func(c *gin.Context) {

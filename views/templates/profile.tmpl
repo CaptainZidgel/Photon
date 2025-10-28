@@ -247,19 +247,22 @@ let thumbsBox = document.getElementById("macy-container");
 let lightbox = document.getElementById("lbox");
 lightbox.style.display = "none";
 
-function createThumbnail(gallery) {
-	let el = document.createElement("img");
-	el.src = gallery.Thumb;
-	el.addEventListener("click", (e) => {
-		toggleModal(gallery)
-	})
-	el.classList.add("gallery-thumb");
-	thumbsBox.appendChild(el);
+function createThumbnails() {
+	while (thumbsBox.firstChild) {
+		thumbsBox.removeChild(thumbsBox.firstChild);
+	}
+	for (let gallery of gals) {
+		let el = document.createElement("img");
+		el.src = gallery.Thumb;
+		el.addEventListener("click", (e) => {
+			toggleModal(gallery)
+		})
+		el.id = "photo"+gallery.Id;
+		el.classList.add("gallery-thumb");
+		thumbsBox.appendChild(el);
+	}
 }
-
-for (let g of gals) {
-	createThumbnail(g)
-}
+createThumbnails()
 
 {{if $SU}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
     //https://stackoverflow.com/a/54964425/12514997
@@ -272,14 +275,22 @@ for (let g of gals) {
         } else if (endpoint == "deleteGal") {
 			url = "/delete_gal";
         }
-        var request = new XMLHttpRequest();
+        let request = new XMLHttpRequest();
         request.open('POST', url, true);
         request.onreadystatechange = function() {
             if (request.readyState == 4) {
                 if (request.status >= 200 && request.status <= 201) {
-                    if (endpoint=="avatar") {pfp.src = JSON.parse(request.response).url;};
-                } else {                                                                //funfact its actually not possible to receive anything but 201!! I know this because I wrote the server!!
-                    alert("Image failed to send to server. Status: " + request.status); //thats a blatant lie you can receive a 415, i know this because i wrote the server!!!!
+                    if (endpoint=="avatar") {
+						pfp.src = JSON.parse(request.response).url;
+					} else if (endpoint == "deleteGal") {
+						let id = currentGal.Id;
+						let thumb = document.getElementById("photo"+id);
+						thumb.remove();
+						macy.recalculate(true);
+						toggleModal(undefined);
+					}
+                } else {
+                    alert("Message failed to send to server. Status: " + request.status);
                 }
             }
         };
@@ -424,7 +435,7 @@ window.onclick = function(event) {
 }
 </script>
 <script>
-	macy = Macy({
+	const macy = Macy({
 		container: "#macy-container",
 		trueOrder: true,
 		waitForImages: true,
