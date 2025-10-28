@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"errors"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
@@ -462,6 +463,11 @@ func main() {
 			PopulateGallery(sqlSELECTphotos, &gallery)
 			gals = append(gals, gallery)
 		}
+		bytes, err := json.Marshal(gals)
+		if err != nil {
+			panic(err)
+		}
+		jsonGals := string(bytes[:])
 
 		var SameUser bool
 		if myUser != nil && myUser.(User).id == user.id {
@@ -470,7 +476,7 @@ func main() {
 			SameUser = false
 		}
 		fmt.Println("Same user:", SameUser)
-		c.HTML(200, "profile.tmpl", gin.H{"User": user, "Galleries": gals, "myUser": myUser, "SameUser": SameUser})
+		c.HTML(200, "profile.tmpl", gin.H{"User": user, "Galleries": gals, "myUser": myUser, "SameUser": SameUser, "jsonGals": jsonGals})
 	})
 
 	rout.GET("/other/:o", func(c *gin.Context) {

@@ -5,7 +5,7 @@
 <script src=" https://cdn.jsdelivr.net/npm/macy@2.5.1/dist/macy.min.js "></script>
 <title>{{.User.Username}}</title>
 </head>
-
+<body>
 <div id="body">
 	{{if $SU}}
 	<div id="pfp-form-container" class="lbox" style="display: none;"> <!--I don't know if reusing lbox here is a good idea but I'm doing it anyway-->
@@ -38,55 +38,34 @@
 		@{{.User.Username}}
 	</div>
 
-	<div id="macy-container">
-		{{range $gi, $g := .Galleries}}
-			{{if $g.Photos}}
-					<img src="{{$g.Thumb}}" onclick="toggleModal({{$gi}}, {{$g.Id}})" class="gallery-thumb">
-				<div class="lbox" id="lbox-{{$gi}}" style="display: none;">
-					<div class="closeModal" onclick="toggleModal({{$gi}})">X</div>
-		  {{if $SU}}<div class="deleteGallery">Delete This Gallery?</div>{{end}}
-					<div class="lightbox-content">
-						<div class="photo-container">
-							{{range $pi, $p := $g.Photos}}
-								<span class="slide" id="slide-{{$gi}}:{{$pi}}">
-									<img src="{{ $p.Reference }}" class="photo">
-								</span>
-							{{end}}
-						</div>
-						<div class="lightbox-sidebar">
-							{{if (gt (len $g.Photos) 1)}}
-							<div class="navigation-controls">
-								<div class="prev" onclick="changeSlide({{$gi}}, -1)"><<</div>
-								<div class="next" onclick="changeSlide({{$gi}}, 1)">>></div>
-							</div>
-							{{end}}
-							<div class="infobox gal-info">
-								<span class="description">
-								    {{ $g.Description }}
-								</span>
-								<span class="gallery-upload-stamp">
-								    {{ $g.Uploaded }}
-								</span>
-							</div>
-							{{range $pi, $p := $g.Photos}}
-								<div class="slide-info" id="info-{{$gi}}:{{$pi}}" style="display: none;">
-									<table class="infobox img-exif">
-										{{range $k, $v := $p.Exif}}
-										<tr>
-											<td>{{$k}}</td>
-											<td>{{$v}}<td>
-										</tr>
-										{{end}}
-									</table>
-								</div>
-							{{end}}
-						</div>
+	<div id="img-grid">
+		<div id="macy-container"></div>
+		<div id="lbox">
+			<div id="closeModal" onclick="toggleModal(undefined)">X</div>
+			{{if $SU}}<div id="deleteGallery">Delete this gallery?</div>{{end}}
+			<div id="lightbox-content">
+				<div id="photo-container">
+					<img id="photo" src="" class="photo">
+				</div>
+				<div id="sidebar">
+					<div id="navigation-controls">
+						<div class="change-slide" onclick="changeSlide(-1)"><<</div>
+						<div class="change-slide" onclick="changeSlide(1)">>></div>
+					</div>
+					<div class="infobox gal-info">
+						<p id="gallery-description">
+						</p>
+						<p id="gallery-upload-stamp">
+						</p>
+						<table class="infobox" id="img-exif">
+						</table>
 					</div>
 				</div>
-			{{end}}
-		{{end}}
+			</div>
+		</div>
 	</div>
 </div>
+</body>
 <style>
 #body {
 	margin-left: auto;
@@ -116,7 +95,7 @@
 	object-fit: contain;
 }
 
-.lbox {
+#lbox {
 	position: fixed;
 	z-index: 1;
 	width: 100%;
@@ -129,7 +108,7 @@
 	justify-content: center;
 }
 
-.lightbox-content {
+#lightbox-content {
 	display: flex;
 	width: 90%;
 	height: 100vh;
@@ -140,7 +119,7 @@
 	margin: auto;
 }
 
-.photo-container {
+#photo-container {
 	flex: 1;
 	display: flex;
 	align-items: center;
@@ -150,13 +129,13 @@
 	height: 100vh;
 }
 
-.photo-container img {
+#photo-container img {
 	max-width: 100%;
 	height: 100vh;
 	object-fit: contain;
 }
 
-.lightbox-sidebar {
+#sidebar {
 	width: 300px;
 	background-color: white;
 	padding: 20px;
@@ -169,7 +148,7 @@
 	word-wrap: break-word;
 }
 
-.navigation-controls {
+#navigation-controls {
 	display: flex;
 	gap: 10px;
 	justify-content: center;
@@ -180,7 +159,7 @@
     height: 25px;
 }
 
-.closeModal {
+#closeModal {
 	position: absolute;
 	top: 10px;
 	right: 10px;
@@ -192,11 +171,11 @@
 	z-index: 10;
 }
 
-.closeModal:hover {
+#closeModal:hover {
 	background-color: #2a2a2a;
 }
 
-.deleteGallery {
+#deleteGallery {
 	position: absolute;
 	bottom: 10px;
 	right: 10px;
@@ -208,11 +187,11 @@
 	z-index: 10;
 }
 
-.deleteGallery:hover {
+#deleteGallery:hover {
 	background-color: #2a2a2a;
 }
 
-.prev, .next {
+.change-slide {
 	color: white;
 	background-color: #4a4a4a;
 	padding: 10px 15px;
@@ -222,14 +201,12 @@
 	flex: 1;
 }
 
-.prev:hover, .next:hover {
+.change-slide:hover {
 	background-color: #2a2a2a;
 }
 
 #img-grid {
 	max-width: 90rem;
-	display: flex;
-	flex-wrap: wrap;
 	margin: 0 auto 3rem;
 	outline: auto;
 }
@@ -239,10 +216,14 @@
 	width: 60rem;
 }
 
-.infobox {
+#infobox {
 	background-color: gray;
 	display: inline-block;
 	width: 300px;
+}
+
+tr:nth-child(even) {
+	background-color: light-gray;
 }
 
 .bio {
@@ -258,11 +239,28 @@
 #bio-modifier {
     resize: none;
 }
-
-#delete-gallery {
-}
 </style>
 <script type="text/javascript" defer>
+let gals = JSON.parse({{.jsonGals}});
+
+let thumbsBox = document.getElementById("macy-container");
+let lightbox = document.getElementById("lbox");
+lightbox.style.display = "none";
+
+function createThumbnail(gallery) {
+	let el = document.createElement("img");
+	el.src = gallery.Thumb;
+	el.addEventListener("click", (e) => {
+		toggleModal(gallery)
+	})
+	el.classList.add("gallery-thumb");
+	thumbsBox.appendChild(el);
+}
+
+for (let g of gals) {
+	createThumbnail(g)
+}
+
 {{if $SU}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
     //https://stackoverflow.com/a/54964425/12514997
     function formSubmit(sourceForm, endpoint) {
@@ -353,39 +351,56 @@
 
 	deleteDialog.addEventListener("close", (e) => {
 		if (deleteDialog.returnValue === "confirm") {
+			let dgi = document.getElementById("delete-gallery-id");
+			dgi.value = currentGal.Id;
 			formSubmit(deleteDialog.children[0], "deleteGal");
 		}
 	})
 {{end}}
 
-function toggleModal(modal_id, gallery_id) {
-	slides(modal_id, 0);
-	if (document.getElementById("lbox-"+modal_id).style.display === "none") {
-		document.getElementById("lbox-"+modal_id).style.display = "block";
-		if (gallery_id) {document.getElementById("delete-gallery-id").value = gallery_id;}
+let currentGal = undefined;
+let currentSlide = 0;
+function toggleModal(gallery) {
+	let lbox = document.getElementById("lbox");
+	currentGal = gallery;
+	if (gallery === undefined) {
+		lbox.style.display = "none";
 	} else {
-		document.getElementById("lbox-"+modal_id).style.display = "none";
+		lbox.style.display = "block";
+		let navs = document.getElementById("navigation-controls");
+		if (gallery.Photos.length == 1) {
+			navs.style.display = "none";
+		} else {
+			navs.style.display = "flex";
+		}
+		let desc = document.getElementById("gallery-description");
+		let upload = document.getElementById("gallery-upload-stamp");
+		desc.innerHTML = gallery.Description;
+		upload.innerHTML = gallery.Uploaded;
+		currentSlide = 0;
+		changeSlide(currentSlide);
 	}
 }
 
-function slides(gallery, slide) {
-	let i;
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`)
-	let infoElements = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide-info`)
-	if (slide < 0) {
-		slide = x.length - 1;
-	} else if (slide > x.length - 1) {
-		slide = 0;
-	}
-	for (let i = 0; i < x.length; i++) {
-		x[i].style.display = "none";
-		if (infoElements[i]) {
-			infoElements[i].style.display = "none";
+function changeSlide(n) {
+	let maxSlides = currentGal.Photos.length;
+	console.log(currentSlide, currentSlide+n);
+	if (currentSlide+n <= maxSlides-1 && currentSlide+n >= 0) {
+		currentSlide = currentSlide + n;
+		let pc = document.getElementById("photo");
+		let photo = currentGal.Photos[currentSlide];
+		pc.src = photo.Reference;
+		let exif = document.getElementById("img-exif");
+		while (exif.firstChild) {
+			exif.removeChild(exif.firstChild);
 		}
-	}
-	x[slide].style.display = "inline";
-	if (infoElements[slide]) {
-		infoElements[slide].style.display = "block";
+		for (key in photo.Exif) {
+			let row = exif.insertRow();
+			let c1 = row.insertCell(key);
+			let c2 = row.insertCell();
+			c1.innerHTML = key;
+			c2.innerHTML = photo.Exif[key];
+		}
 	}
 }
 
@@ -402,21 +417,10 @@ window.onclick = function(event) {
 	if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
 		toggleAvatarForm();
 	}
-	if (cname == "deleteGallery") {
-		let n = event.target.parentElement.id.match(/lbox-(\d+)/)[1];
+	if (id == "deleteGallery") {
 		deleteDialog.showModal();
 	}
 	{{end}}
-}
-
-function changeSlide(gallery, direction) {
-	let x = document.getElementById(`lbox-${gallery}`).getElementsByClassName(`slide`);
-	for (let i = 0; i < x.length; i++) {
-		if (x[i].style.display != "none") {
-			slides(gallery, i + direction);
-			return;
-		}
-	}
 }
 </script>
 <script>
