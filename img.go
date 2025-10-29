@@ -21,8 +21,11 @@ import (
 	_ "time"
 )
 
-var maxWidth int = 200
-var maxHeight int = 200
+const maxWidth int = 1028
+const maxHeight int = 1028
+const minWidth int = 256
+const minHeight int = 256
+const aviSize int = 256 //size of one side of perimeter
 
 type Exif map[string]string
 
@@ -121,7 +124,7 @@ func ExifFromStruct(p Photo) Exif {
 	exif := make(Exif)
 	exif["Date Taken"] = p.Datetaken
 	exif["F-Stop"] = p.Fstop
-	exif["ISO"] = string(p.ISO)
+	exif["ISO"] = strconv.Itoa(p.ISO)
 	exif["Model"] = p.Model
 	exif["Lens"] = p.Lens
 	return exif
@@ -287,12 +290,21 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 }
 
 func DetermineNewSize(w int, h int) (int, int) { //https://stackoverflow.com/a/14731922/12514997
-	var ratio float64 = math.Min(float64(maxWidth)/float64(w), float64(maxHeight)/float64(h))
-	return int(float64(w) * ratio), int(float64(h) * ratio)
+	if w > maxWidth || h > maxHeight {
+		var ratio float64 = math.Min(float64(maxWidth)/float64(w), float64(maxHeight)/float64(h))
+		var newW, newH int = int(float64(w) * ratio), int(float64(h) * ratio)
+		return newW, newH
+	} else if w < minWidth || h < minHeight {
+		var ratio float64 = math.Max(float64(minWidth)/float64(w), float64(minHeight)/float64(h))
+		var newW, newH int = int(float64(w) * ratio), int(float64(h) * ratio)
+		return newW, newH
+	} else {
+		return w, h
+	}
 }
 
 // pass a byte slice of an original image, pass the extension (so we know how to encode it), pass a bool indicating if it is an image to be automatically resized (thumbnail for uploaded image) or a profile picture with a fixed final size
-func CreateThumb(original []byte, extension string, autores bool) []byte {
+func CreateThumb(original []byte, extension string, isAvi bool) []byte {
 	rdr := bytes.NewReader(original)
 	uploaded, _, err := image.Decode(rdr) //uploaded is image.Image
 	if err != nil || uploaded == nil {
@@ -300,10 +312,10 @@ func CreateThumb(original []byte, extension string, autores bool) []byte {
 	}
 
 	var newW, newH int
-	if autores { //if should be automatically resized
+	if isAvi {
+		newW, newH = aviSize, aviSize
+	} else {
 		newW, newH = DetermineNewSize(uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
-	} else { //this is a pfp
-		newW, newH = 256, 256
 	}
 	thumb := Scale(uploaded, image.Rect(0, 0, newW, newH), draw.ApproxBiLinear)
 
