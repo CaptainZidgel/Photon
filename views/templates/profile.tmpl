@@ -8,12 +8,13 @@
 <body>
 <div id="body">
 	{{if $SU}}
-	<div id="pfp-form-container" class="lbox" style="display: none;"> <!--I don't know if reusing lbox here is a good idea but I'm doing it anyway-->
+	<dialog id="pfp-form-container">
+		<p>Pick a new face!</p>
 		<form id="pfp-form" action="/update_avatar" method="post" enctype="multipart/form-data">
 		    <input type="file" name="pfp" accept="image/*">
-			<input type="submit">
+			<input type="submit" value="Upload">
 		</form>
-	</div>
+	</dialog>
 
 	<dialog id="delete-dialog">
 		<form method="dialog">
@@ -145,7 +146,6 @@
 
 #pfp-form-container {
     background-color: white;
-    height: 25px;
 }
 
 #closeModal {
@@ -300,19 +300,7 @@ createThumbnails()
             fd.append("biography", document.getElementById("bio-modifier").value);
             request.send(fd);
         }
-        if (endpoint == "avatar") {
-            toggleAvatarForm();
-        }
     }
-
-	function toggleAvatarForm() {
-		let p = document.getElementById("pfp-form-container");
-		if (p.style.display === "none") {
-			p.style.display = "block";
-		} else {
-			p.style.display = "none";
-		}
-	}
 
 	function toggleBioModifier() {
         let bm = document.getElementById("bio-modifier");
@@ -417,7 +405,7 @@ window.onclick = function(event) {
 	}
 	{{if $SU}}
 	if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
-		toggleAvatarForm();
+		pfpformc.showModal();
 	}
 	if (id == "deleteGallery") {
 		deleteDialog.showModal();
