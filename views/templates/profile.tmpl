@@ -28,14 +28,14 @@
 	{{end}}
 
 	<div id="user-info">
-		<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
-		<span class="bio" id="bio-text"     {{if $SU}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</span>
-		{{if $SU}}
-			<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>
-			<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p><br>
-		{{end}}
-		<strong>{{.User.Displayname}}</strong><br>
-		@{{.User.Username}}
+		<div id="user-info-top">
+			<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
+			<div class="bio" id="bio-text"     {{if $SU}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</div>
+			{{if $SU}}<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>{{end}}
+		</div>
+			{{if $SU}}<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p>{{end}}
+		<div id="display-name"><strong>{{.User.Displayname}}</strong></div>
+		<div id="username">@{{.User.Username}}</div>
 	</div>
 
 	<div id="img-grid">
@@ -204,6 +204,10 @@
 	width: 60rem;
 }
 
+#user-info-top {
+	display:flex;
+}
+
 #infobox {
 	background-color: gray;
 	display: inline-block;
@@ -215,11 +219,8 @@ tr:nth-child(even) {
 }
 
 .bio {
+	flex-grow: 1;
     outline: dashed;
-    width: 25%;
-    display: inline-block;
-    position: absolute;
-    height: 40%;
     overflow-wrap: break-word;
     white-space: pre-wrap;
 }
