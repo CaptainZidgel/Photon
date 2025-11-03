@@ -23,8 +23,8 @@ import (
 
 const maxWidth int = 1028
 const maxHeight int = 1028
-const minWidth int = 256
-const minHeight int = 256
+const minWidth int = 10
+const minHeight int = 10
 const aviSize int = 256 //size of one side of perimeter
 
 type Exif map[string]string
@@ -289,12 +289,13 @@ func Scale(src image.Image, rect image.Rectangle, scale draw.Scaler) image.Image
 	return dst
 }
 
+// Determine new size is used to resize images for thumbnails, or to avatar size if necessary. Input: size of image. Output: new bounds, proportionally.
 func DetermineNewSize(w int, h int) (int, int) { //https://stackoverflow.com/a/14731922/12514997
-	if w > maxWidth || h > maxHeight {
+	if w > maxWidth || h > maxHeight { //if image is bigger than max sizes (it will be downsized)
 		var ratio float64 = math.Min(float64(maxWidth)/float64(w), float64(maxHeight)/float64(h))
 		var newW, newH int = int(float64(w) * ratio), int(float64(h) * ratio)
 		return newW, newH
-	} else if w < minWidth || h < minHeight {
+	} else if w < minWidth || h < minHeight { //if image is smaller than min size (it will be upsized)
 		var ratio float64 = math.Max(float64(minWidth)/float64(w), float64(minHeight)/float64(h))
 		var newW, newH int = int(float64(w) * ratio), int(float64(h) * ratio)
 		return newW, newH
@@ -316,6 +317,7 @@ func CreateThumb(original []byte, extension string, isAvi bool) []byte {
 		newW, newH = aviSize, aviSize
 	} else {
 		newW, newH = DetermineNewSize(uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
+		fmt.Println(newW, newH, uploaded.Bounds().Dx(), uploaded.Bounds().Dy())
 	}
 	thumb := Scale(uploaded, image.Rect(0, 0, newW, newH), draw.ApproxBiLinear)
 

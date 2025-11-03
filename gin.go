@@ -395,7 +395,7 @@ func main() {
 					var buf bytes.Buffer
 					file.Seek(0, 0)
 					buf.ReadFrom(file)
-					thumb = CreateThumb(buf.Bytes(), extension, true)
+					thumb = CreateThumb(buf.Bytes(), extension, false)
 					err := UploadToCDN(bytes.NewReader(thumb), thumb_path)
 					if err != nil {
 						panic(err)
@@ -548,7 +548,7 @@ func main() {
 			var thumb []byte
 
 			var main_path, _ string = DefinePath("Noneedforthisparam", scrubbed_image, extension, "avatar")
-			thumb = CreateThumb(scrubbed_image, extension, false)
+			thumb = CreateThumb(scrubbed_image, extension, true)
 			err := UploadToCDN(bytes.NewReader(thumb), main_path)
 			if err != nil {
 				panic(err)

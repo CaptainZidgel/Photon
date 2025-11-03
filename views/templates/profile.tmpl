@@ -75,25 +75,15 @@
 
 .gallery-thumb {
 	padding: 1px;
-	display: inline-block;
 	margin: 10px;
 	box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3), 0 8px 16px rgba(0, 0, 0, 0.2);
-	overflow: hidden;
 	transition: transform 0.3s ease, box-shadow 0.3s ease;
-	max-width: 30%;
 }
 .gallery-thumb:hover {
 	transform: translateY(-4px);
 	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4), 0 16px 32px rgba(0, 0, 0, 0.3);
 }
-.gallery-thumb img {
-	width: auto;
-	height: auto;
-	max-width: 100%;
-	max-height: 300px;
-	display: block;
-	object-fit: contain;
-}
+
 
 #lbox {
 	position: fixed;
@@ -207,7 +197,6 @@
 #img-grid {
 	max-width: 90rem;
 	margin: 0 auto 3rem;
-	outline: auto;
 }
 
 #user-info {
@@ -251,7 +240,9 @@ function createThumbnails() {
 		thumbsBox.removeChild(thumbsBox.firstChild);
 	}
 	for (let gallery of gals) {
+		let span = document.createElement("span");
 		let el = document.createElement("img");
+		//span.appendChild(el);
 		el.src = gallery.Thumb;
 		el.addEventListener("click", (e) => {
 			toggleModal(gallery)
@@ -440,7 +431,7 @@ window.onclick = function(event) {
 		waitForImages: true,
 		columns: 3,
 		margin: {
-			x: 0,
+			x: 20,
 			y: 20,
 		},
 	})
