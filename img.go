@@ -16,7 +16,6 @@ import (
 	"log"
 	"math"
 	_ "os"
-	"strconv"
 	"strings"
 	_ "time"
 )
@@ -124,7 +123,7 @@ func ExifFromStruct(p Photo) Exif {
 	exif := make(Exif)
 	exif["Date Taken"] = p.Datetaken
 	exif["F-Stop"] = p.Fstop
-	exif["ISO"] = strconv.Itoa(p.ISO)
+	exif["ISO"] = p.ISO
 	exif["Model"] = p.Model
 	exif["Lens"] = p.Lens
 	return exif
@@ -137,7 +136,7 @@ type Photo struct {
 
 	Datetaken string
 	Fstop     string
-	ISO       int
+	ISO       string
 	Model     string
 	Lens      string
 
@@ -217,13 +216,6 @@ func UpdateGalleryDB(db *sql.DB, gallery *Gallery) {
 
 // the exif map is all string, but my Photo struct/SQL table is typed. Probably because I have no foresight. Nonetheless!
 func NewPhoto(db *sql.DB, reference string, gallery int, exifmap Exif) *Photo {
-	var ISO int
-	if exifmap["ISO"] == "" {
-		ISO = 0
-	} else {
-		ISOtemp, _ := strconv.Atoi(exifmap["ISO"])
-		ISO = ISOtemp
-	}
 	/*
 		var Fstop float64
 		if exifmap["F-Stop"] == "" {
@@ -237,9 +229,7 @@ func NewPhoto(db *sql.DB, reference string, gallery int, exifmap Exif) *Photo {
 		}
 	*/
 
-	//datetaken := exifmap["Date Taken"]
-
-	photo := Photo{-102, reference, gallery, exifmap["Date Taken"], exifmap["F-Stop"], ISO, exifmap["Model"], exifmap["Lens"], exifmap}
+	photo := Photo{-102, reference, gallery, exifmap["Date Taken"], exifmap["F-Stop"], exifmap["ISO"], exifmap["Model"], exifmap["Lens"], exifmap}
 	id := InsertPhotoIntoDatabase(db, photo)
 	photo.Id = id
 	return &photo
