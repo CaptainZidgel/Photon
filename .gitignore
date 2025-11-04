@@ -4,3 +4,4 @@ reserved_names.csv
 go.sum
 .env
 todo
+*.ttf

@@ -5,80 +5,90 @@
 	<span id="self-ref">Hi, <a href="/p/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
 	<span id="logio"><a href="/logout">Logout</a></span>
 	<span id="upload" onclick="toggleUpload()">Upload to Photon</span>
-	<div id="UPLOAD-CONTAINER" style="display: none">
+	<dialog id="UPLOAD-CONTAINER">
 		<form action="/upload" id="upload-form" method="POST" enctype="multipart/form-data">
 			<input type="file" name="files" accept="image/*" multiple><br>
-			<textarea name="desc" rows="25" cols="50">
-	My photo!
+			<textarea id="upload-desc" name="desc" rows="25" cols="50">My photo!
 
-	License: MY-LICENSE
-			</textarea><br>
+License: MY-LICENSE</textarea><br>
 
-			<input id="tags" name="tags" placeholder="Up to 3 comma separated tags"></input><br>
+			<input id="upload-tags" name="tags" placeholder="Up to 3 comma separated tags"></input><br>
 
 			<input id="upload-submit" type="submit" value="Upload your photo!"><br>
 		</form>
-	</div>
+	</dialog>
 	{{else}}
 	<span id="logio"><a href="/login">Login</a></span>
 	{{end}}
 </div>
 <script>
-	function toggleUpload() {
-		if (document.getElementById("UPLOAD-CONTAINER").style.display === "none") {
-			document.getElementById("UPLOAD-CONTAINER").style.display = "block";
-		} else {
-			document.getElementById("UPLOAD-CONTAINER").style.display = "none";
+{{if .myUser}}
+let uc = document.getElementById("UPLOAD-CONTAINER");
+function toggleUpload() {
+	uc.showModal();
+}
+
+function uploadReq() {
+	let request = new XMLHttpRequest();
+	request.open('POST', "/upload", true);
+	//request.setRequestHeader("Content-Type", "multipart/form-data; boundary=imgboundary&")
+	request.onreadystatechange = function() {
+		if (request.readyState == 4) {
+			if (request.status >= 200 && request.status <= 201) {
+				uploadForm.reset();
+			} else {
+				alert("Message failed to send to server. Status: " + request.status);
+			}
 		}
 	}
+	request.send(new FormData(uploadForm));
+}
 
-	function uploadReq() {
-		let request = new XMLHttpRequest();
-        request.open('POST', "/upload", true);
-        //request.setRequestHeader("Content-Type", "multipart/form-data; boundary=imgboundary&")
-        request.onreadystatechange = function() {
-            if (request.readyState == 4) {
-                if (request.status >= 200 && request.status <= 201) {
-					uploadForm.reset();
-                } else {
-                    alert("Message failed to send to server. Status: " + request.status);
-                }
-            }
-        }
-        request.send(new FormData(uploadForm));
-	}
-
-	let uploadForm = document.getElementById("upload-form");
-	uploadForm.addEventListener("submit", (e) => {
-		e.preventDefault();
-		uploadReq(uploadForm);
-	})
+let uploadForm = document.getElementById("upload-form");
+uploadForm.addEventListener("submit", (e) => {
+	e.preventDefault();
+	uploadReq(uploadForm);
+	uc.close();
+})
+{{end}}
 </script>
 {{if .Error}}<p class="err">{{.Error}}</p>{{end}}
 {{template "content" . }}
 </body>
 <style>
-	body {
-		margin: 0px;
-	}
-	#header {
-		background-color: gray;
-		width: 100%;
-		overflow: hidden;
-	}
-	#logio {
-		float: right;
-	}
-	#self-ref {
-		float: right;
-	}
-	a {
-		color: white;
-		text-decoration: none;
-	}
-	
-	.err {
-	    color: red;
-	}
+@font-face: {
+	font-family: "Liberation";
+	src: url("./LiberationSans-Bold.ttf");
+}
+
+body {
+	margin: 0px;
+	font-family: "Liberation", sans-serif;
+}
+#header {
+	background-color: gray;
+	width: 100%;
+	overflow: hidden;
+}
+#logio {
+	float: right;
+}
+#self-ref {
+	float: right;
+}
+a {
+	color: white;
+	text-decoration: none;
+}
+#upload-tags {
+	width: 100%;
+}
+#upload-desc {
+	width: 100%;
+}
+
+.err {
+	color: red;
+}
 </style>
 </html>

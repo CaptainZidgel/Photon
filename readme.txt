@@ -5,3 +5,9 @@ Designed for use with bunny.net CDN
 
 AI Disclosure:
 Cursor was used to generate some CSS/HTML styling and structuring. All logic/imperative/functional code and Go files written by me and me alone..
+
+Special Thanks:
+Font: Liberation Sans Bold
+    https://github.com/liberationfonts/liberation-fonts
+Image Grid Masonry Library: Macy.js
+    https://github.com/bigbite/macy.js
