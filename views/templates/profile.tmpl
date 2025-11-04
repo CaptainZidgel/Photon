@@ -31,11 +31,11 @@
 	<div id="user-info">
 		<div id="user-info-top">
 			<img width="256" height="256" src="{{.User.Avatar}}" id="pfp">
-			<div class="bio" id="bio-text"     {{if $SU}}onclick="toggleBioModifier()"{{end}}>{{.User.Bio}}</div>
-			{{if $SU}}<textarea class="bio" id="bio-modifier" onblur="updateBio()" style="display: none">{{.User.Bio}}</textarea>{{end}}
+			<div class="bio" id="bio-text"     {{if $SU}}onclick="toggleBioModifier('bio')"{{end}}>{{.User.Bio}}</div>
+			{{if $SU}}<textarea class="modifiers bio" id="bio-modifier" onblur="updateBio('bio')" style="display: none">{{.User.Bio}}</textarea>{{end}}
 		</div>
-			{{if $SU}}<p style="display: inline;">Welcome to your profile, {{.myUser.Displayname}}</p>{{end}}
-		<div id="display-name"><strong>{{.User.Displayname}}</strong></div>
+		<div id="displayname-text" {{if $SU}}onclick="toggleBioModifier('displayname')"{{end}}>{{.User.Displayname}}</div>
+		{{if $SU}}<textarea class="modifiers" id="displayname-modifier" onblur="updateBio('displayname')" style="display: none">{{.User.Displayname}}</textarea>{{end}}
 		<div id="username">@{{.User.Username}}</div>
 	</div>
 
@@ -225,8 +225,13 @@ tr:nth-child(even) {
     white-space: pre-wrap;
 }
 
-#bio-modifier {
+.modifiers {
     resize: none;
+}
+
+#displayname-text {
+	font-weight: bold;
+	display: table;
 }
 </style>
 <script type="text/javascript" defer>
@@ -240,6 +245,7 @@ function createThumbnails() {
 	while (thumbsBox.firstChild) {
 		thumbsBox.removeChild(thumbsBox.firstChild);
 	}
+	let lastInserted = null;
 	for (let gallery of gals) {
 		let span = document.createElement("span");
 		let el = document.createElement("img");
@@ -250,7 +256,7 @@ function createThumbnails() {
 		})
 		el.id = "photo"+gallery.Id;
 		el.classList.add("gallery-thumb");
-		thumbsBox.appendChild(el);
+		lastInserted = thumbsBox.insertBefore(el, lastInserted);
 	}
 }
 createThumbnails()
@@ -261,10 +267,12 @@ createThumbnails()
         var url = "";
         if (endpoint == "avatar") {
             url = "/update_avatar";
-        } else if (endpoint == "bio") {
+        } else if (endpoint == "bio" || endpoint == "displayname") {
             url = "/update_bio";
         } else if (endpoint == "deleteGal") {
 			url = "/delete_gal";
+        } else {
+			throw new Error("Unexpected endpoint in formSubmit: " + endpoint);
         }
         let request = new XMLHttpRequest();
         request.open('POST', url, true);
@@ -295,37 +303,54 @@ createThumbnails()
 			let fd = new FormData(sourceForm); // create FormData using values from a <form> identified by sourceForm
 			console.log(fd);
 			request.send(fd);
-        } else {
+        } else { //when the source form is undefined, it means its not taking data from an existing HTML form. IE a simple change like updating bio or displayname
             let fd = new FormData();
-            fd.append("biography", document.getElementById("bio-modifier").value);
+            fd.append("feature", endpoint)
+            fd.append("text", document.getElementById(endpoint+"-modifier").value);
             request.send(fd);
         }
     }
 
-	function toggleBioModifier() {
-        let bm = document.getElementById("bio-modifier");
-        let bio = document.getElementById("bio-text");
-        let disp = bio.style.display;
+	function toggleBioModifier(type) {
+        let modifier, text
+        if (type == "bio") {
+			modifier = document.getElementById("bio-modifier")
+			text = document.getElementById("bio-text")
+		} else if (type == "displayname") {
+			modifier = document.getElementById("displayname-modifier")
+			text = document.getElementById("displayname-text")
+		} else {
+			throw new Error("Unknown endpoint for profile update. Use bio or displayname, not: " + type);
+		}
+        let disp = text.style.display;
         if (disp === "none") {
-            bio.style.display = "inline-block";
-            bm.style.display = "none";
+            text.style.display = "table";
+            modifier.style.display = "none";
         } else {
-            bio.style.display = "none";
-            bm.style.display = "inline-block";
-            bm.focus();
+            text.style.display = "none";
+            modifier.style.display = "table";
         }
     }
 
-    function updateBio() { //validate and then POST if necessary (dont need to send a post if theres no change!)
-        let bm = document.getElementById("bio-modifier");
-        let bio = document.getElementById("bio-text");
-        if (bio.textContent != bm.value) {
-            console.log("HM!");
-            formSubmit(undefined, "bio");
-            bio.textContent = bm.value;
+    //validate and POST if necessary
+    //type - bio or displayname
+    function updateBio(type) { //validate and then POST if necessary (dont need to send a post if theres no change!)
+		let modifier, text;
+		if (type == "bio") {
+			modifier = document.getElementById("bio-modifier")
+			text = document.getElementById("bio-text")
+		} else if (type == "displayname") {
+			modifier = document.getElementById("displayname-modifier")
+			text = document.getElementById("displayname-text")
+		} else {
+			throw new Error("Unknown endpoint for profile update. Use bio or displayname, not: " + type);
+		}
+        if (text.textContent != modifier.value) {
+            formSubmit(undefined, type);
+            text.textContent = modifier.value;
         }
 
-        toggleBioModifier();
+        toggleBioModifier(type);
     }
 
 	let pfp = document.getElementById("pfp");
@@ -414,15 +439,23 @@ window.onclick = function(event) {
 }
 </script>
 <script>
-	const macy = Macy({
-		container: "#macy-container",
-		trueOrder: true,
-		waitForImages: true,
-		columns: 3,
-		margin: {
-			x: 20,
-			y: 20,
-		},
-	})
+	//Macy performs poorly at edge cases where user has less photos than columns.
+	//It also performs poorly when images are not massive enough to fill column widths. which isn't really an edge case imo.
+	//There are a few ways to handle this but none of them look great. Going to ignore this for now since this is just an example site :D Long term solution would be to fork Macy.
+	if (gals.length <= 3) {
+		let sheet = window.document.styleSheets[0];
+		sheet.insertRule("#macy-container {display: flex; justify-content: center}");
+	} else {
+		const macy = Macy({
+			container: "#macy-container",
+			trueOrder: true,
+			waitForImages: true,
+			columns: 3,
+			margin: {
+				x: 20,
+				y: 20,
+			},
+		})
+	}
 </script>
 {{end}}

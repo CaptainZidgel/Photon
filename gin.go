@@ -163,6 +163,12 @@ func main() {
 	}
 	defer sqlUPDATEuserBIO.Close()
 
+	sqlUPDATEuserDISPLAY, err := db.Prepare("UPDATE users SET displayname = ? WHERE username = ?")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer sqlUPDATEuserDISPLAY.Close()
+
 	/*																																																		*/
 
 	rout := gin.Default()
@@ -567,14 +573,24 @@ func main() {
 	rout.POST("/update_bio", func(c *gin.Context) {
 		myUserI, _ := c.Get("myUser")
 		if myUserI == nil {
-			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to change your profile picture"})
+			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": "You must be logged in to update your profile"})
 			return
 		}
 		myUser := myUserI.(User)
 
-		bio := c.PostForm("biography")
-		//no validation lmao
-		_, err = sqlUPDATEuserBIO.Exec(bio, myUser.Username)
+		feature := c.PostForm("feature")
+		text := c.PostForm("text")
+		var stmt *sql.Stmt
+		if feature == "bio" {
+			stmt = sqlUPDATEuserBIO
+		} else if feature == "displayname" {
+			stmt = sqlUPDATEuserDISPLAY
+		} else {
+			panic("Unknown feature to update in profile")
+			c.JSON(400, gin.H{})
+			return
+		}
+		_, err = stmt.Exec(text, myUser.Username)
 		if err != nil {
 			panic(err)
 		}
