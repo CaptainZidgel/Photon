@@ -47,7 +47,7 @@ func AssembleDriverStr() string {
 var reserved_unames_arr []string = []string{"a", "b"}
 
 type User struct { // &user.id, &user.Username, &user.Displayname, &user.Avatar
-	id          int
+	Id          int
 	Username    string
 	Displayname string
 	Avatar      string
@@ -59,7 +59,7 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 		var myUser User
 		username := sessions.Default(c).Get("username")
 		if username != nil {
-			err := database.QueryRow("SELECT user_id, username, displayname, avatar, bio FROM users WHERE username = ?", username).Scan(&myUser.id, &myUser.Username, &myUser.Displayname, &myUser.Avatar, &myUser.Bio)
+			err := database.QueryRow("SELECT user_id, username, displayname, avatar, bio FROM users WHERE username = ?", username).Scan(&myUser.Id, &myUser.Username, &myUser.Displayname, &myUser.Avatar, &myUser.Bio)
 			if err != nil {
 				if err != sql.ErrNoRows {
 					log.Fatal(err)
@@ -199,7 +199,7 @@ func main() {
 			}
 
 			var user User
-			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
+			notok := sqlSELECTuserNAME.QueryRow(cleanUN).Scan(&user.Id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
 			if notok != sql.ErrNoRows {
 				if notok != nil {
 					log.Fatal(notok)
@@ -362,7 +362,7 @@ func main() {
 			return
 		}
 		photos := uploaded_gallery.File["files"] //get the parameter named "files" from the form
-		gal := NewGallery(db, myUser.id, NowDateString(), gal_descrip)
+		gal := NewGallery(db, myUser.Id, NowDateString(), gal_descrip)
 		gid := int(gal.Id)
 		for p_index, photoheader := range photos {
 			file, err := photoheader.Open() //get associated file for parameter (type: File)
@@ -445,7 +445,7 @@ func main() {
 
 		path := c.Param("path")
 		var user User
-		err := sqlSELECTuserNAME.QueryRow(path).Scan(&user.id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
+		err := sqlSELECTuserNAME.QueryRow(path).Scan(&user.Id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
 		user.Avatar = StorageZoneRead + user.Avatar
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -457,7 +457,7 @@ func main() {
 			}
 		}
 
-		rows, err := sqlSELECTgals.Query(user.id)
+		rows, err := sqlSELECTgals.Query(user.Id)
 		defer rows.Close()
 		gals := make([]Gallery, 0)
 		for rows.Next() {
@@ -474,14 +474,27 @@ func main() {
 		}
 		jsonGals := string(bytes[:])
 
-		var SameUser bool
-		if myUser != nil && myUser.(User).id == user.id {
-			SameUser = true
+		var IsUsersProfile bool
+		var sessionUserFollowsRequestedUser bool
+		if myUser != nil && myUser.(User).Id == user.Id {
+			IsUsersProfile = true
 		} else {
-			SameUser = false
+			IsUsersProfile = false
+			followedBySessionUser := getFollowedBy(db, myUser.(User).Id)
+			if _, exists := followedBySessionUser[user.Id]; exists {
+				log.Println("Follows")
+				sessionUserFollowsRequestedUser = true
+			}
 		}
-		fmt.Println("Same user:", SameUser)
-		c.HTML(200, "profile.tmpl", gin.H{"User": user, "Galleries": gals, "myUser": myUser, "SameUser": SameUser, "jsonGals": jsonGals})
+		fmt.Println("Same user:", IsUsersProfile)
+		c.HTML(200, "profile.tmpl", gin.H{
+			"User": user,
+			"Galleries": gals,
+			"myUser": myUser,
+			"SameUser": IsUsersProfile,
+			"jsonGals": jsonGals,
+			"follows": sessionUserFollowsRequestedUser,
+		})
 	})
 
 	rout.GET("/other/:o", func(c *gin.Context) {
@@ -499,7 +512,7 @@ func main() {
 
 		gid := c.PostForm("gallery-id")
 		log.Printf("Received gallery deletion request, ID %v\n", gid)
-		res, err := sqlDELETEgals.Exec(gid, myUser.id) //res has methods LastInsertId() or RowsAffected().
+		res, err := sqlDELETEgals.Exec(gid, myUser.Id) //res has methods LastInsertId() or RowsAffected().
 		if err != nil {
 			panic(err)
 			c.String(500, "Error deleting gal")
@@ -599,8 +612,75 @@ func main() {
 		return
 	})
 
+	rout.GET("/follow/:id", func(c *gin.Context) {
+		theirId, e := strconv.Atoi(c.Param("id"))
+		if e != nil { //if error converting ID to integer
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		myUserI, _ := c.Get("myUser") //get the logged-in user stored in the session
+		if myUserI == nil {
+			c.String(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		myId := myUserI.(User).Id
+
+		follows := getFollowedBy(db, myId)
+		if _, exists := follows[theirId]; exists { //if user already follows this user
+			log.Println("Skipping redundant follow action")
+			return
+		}
+
+		_, err := db.Exec("INSERT INTO follows VALUES(?, ?)", myId, theirId)
+		if err != nil {
+			log.Println("Error adding follow", err.Error())
+			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": err.Error()})
+			return
+		}
+		c.Status(200)
+	})
+
+	rout.GET("/unfollow/:id", func(c *gin.Context) {
+		theirId, e := strconv.Atoi(c.Param("id"))
+		if e != nil { //if error converting ID to integer
+			c.Status(http.StatusBadRequest)
+			return
+		}
+		myUserI, _ := c.Get("myUser") //get the logged-in user stored in the session
+		if myUserI == nil {
+			c.String(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+		myId := myUserI.(User).Id
+
+		_, err := db.Exec("DELETE FROM follows WHERE follower = ? and followed = ?", myId, theirId)
+		if err != nil {
+			log.Println("Error removing follow", err.Error())
+			c.HTML(http.StatusUnauthorized, "index.tmpl", gin.H{"Error": err.Error()})
+			return
+		}
+		c.Status(200)
+	})
+
 	fmt.Println("Serving on 0.0.0.0:8080")
 	rout.Run()
+}
+
+func getFollowedBy(db *sql.DB, user_id int) map[int]struct{} {
+	rows, err := db.Query("SELECT followed FROM follows WHERE follower = ?", user_id)
+	if err != nil {
+		log.Println("Error getting followed users", err.Error())
+		return map[int]struct{}{}
+	}
+	ids := make(map[int]struct{})
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			log.Fatal(err)
+		}
+		ids[id] = struct{}{}
+	}
+	return ids
 }
 
 func loadTemplates(dir string) multitemplate.Renderer {

@@ -4,6 +4,12 @@ USE photon;
 CREATE TABLE IF NOT EXISTS users(user_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT, username VARCHAR(255) NOT NULL, displayname VARCHAR(255), pass VARCHAR(255) NOT NULL, avatar VARCHAR(255), bio TEXT(2000), registered VARCHAR(255));
 CREATE TABLE IF NOT EXISTS galleries(gallery_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT, owner_id int, thumb VARCHAR(255), description VARCHAR(255), uploaded VARCHAR(255));
 CREATE TABLE IF NOT EXISTS photos(photo_id INT PRIMARY KEY NOT NULL AUTO_INCREMENT, ref VARCHAR(500), gallery_id INT, datetaken varCHAR(255), fstop VARCHAR(255), iso VARCHAR(255), model VARCHAR(255), lens VARCHAR(255));
+CREATE TABLE IF NOT EXISTS follows(
+    follower INT,
+    followed INT,
+    CONSTRAINT `fk_follower` FOREIGN KEY (`follower`) REFERENCES users(`user_id`),
+    CONSTRAINT `fk_followed` FOREIGN KEY (`followed`) REFERENCES users(`user_id`)
+);
 
 CREATE USER IF NOT EXISTS 'mgr'@'%' IDENTIFIED BY 'pword';
 GRANT ALTER, CREATE, DELETE, INDEX, INSERT, UPDATE, SELECT ON `photon`.* TO 'mgr';

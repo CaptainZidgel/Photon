@@ -262,6 +262,33 @@ function createThumbnails() {
 }
 createThumbnails()
 
+function getRequest(url) {
+	let request = new XMLHttpRequest();
+	request.open('GET', url, true);
+	request.onreadystatechange = function() {
+		if (request.readyState == 4) {
+			if (request.status >= 200 && request.status <= 201) {
+				if (url.startsWith("/follow")) {
+					followBtn.innerText = "- Unfollow"
+					sessionUserIsFollowing = true;
+				} else if (url.startsWith("/unfollow")) {
+					followBtn.innerText = "+ Follow"
+					sessionUserIsFollowing = false;
+				}
+			} else {
+				alert("Message failed to send to server. Status: " + request.status);
+			}
+		}
+	};
+
+	request.onerror = function() {
+	// request failed
+		alert("Failed to follow/unfollow. No more information available.");
+	};
+
+	request.send();
+}
+
 {{if $SU}} //for extra protections, dont include these in the templates for strangers (since this is all client side a user could add these back anyway, so its important to have server-side protections)
     //https://stackoverflow.com/a/54964425/12514997
     function formSubmit(sourceForm, endpoint) {
@@ -432,14 +459,28 @@ window.onclick = function(event) {
 		toggleModal(n);
 	}
 	{{if $SU}}
-	if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
+	else if (id == "pfp" || id == "pfp-form-container" || id == "pfp-form") {
 		pfpformc.showModal();
-	}
-	if (id == "deleteGallery") {
+	} else if (id == "deleteGallery") {
 		deleteDialog.showModal();
 	}
 	{{end}}
 }
+
+{{if not $SU}}
+let profileUsername = document.getElementById("username").innerText.slice(1);
+let followBtn = document.createElement("div");
+followBtn.id = "follow";
+let sessionUserIsFollowing = {{.follows}};
+followBtn.innerText = sessionUserIsFollowing ? "- Unfollow" : "+ Follow";
+followBtn.addEventListener("click", (e) => {
+	let action = sessionUserIsFollowing ? "/unfollow/" : "/follow/";
+	getRequest(action+{{.User.Id}});
+})
+
+let userInfo = document.getElementById("user-info");
+userInfo.appendChild(followBtn);
+{{end}}
 </script>
 <script>
 	//Macy performs poorly at edge cases where user has less photos than columns.
