@@ -75,6 +75,13 @@ func GetUser(database *sql.DB) gin.HandlerFunc {
 	}
 }
 
+var db *sql.DB
+var sqlSELECTgals *sql.Stmt
+var sqlSELECTphotos *sql.Stmt
+var sqlSELECTuserID *sql.Stmt
+
+const DEFAULT_AVATAR string = "TBD";
+
 func main() {
 	pcost, _ := strconv.Atoi(os.Getenv("PHOTON_PASSWORD_COST"))
 	Config = config{
@@ -94,12 +101,12 @@ func main() {
 	fmt.Printf("conf: %v\n", Config)
 	nfkd := norm.NFKD.String
 
-	db, err := sql.Open("mysql", AssembleDriverStr())
+	localdb, err := sql.Open("mysql", AssembleDriverStr())
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
-
+	defer localdb.Close()
+	db = localdb
 	//PurgeLostMedia(db)
 
 	/* Prepared statements need only be used for queries you anticipate will be frequent.								*/
@@ -109,7 +116,7 @@ func main() {
 	}
 	defer sqlINSERTuser.Close()
 
-	sqlSELECTuserID, err := db.Prepare("SELECT user_id, username, displayname, avatar, bio FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
+	sqlSELECTuserID, err = db.Prepare("SELECT user_id, username, displayname, avatar, bio FROM users WHERE user_id = ?") //You can only placeholder for VALUES(?) and WHERE thing = ?. Thing CANNOT be a placeholder. CRINGE!
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,13 +134,13 @@ func main() {
 	}
 	defer sqlSELECTuserPASS.Close()
 
-	sqlSELECTphotos, err := db.Prepare("SELECT ref, photo_id, gallery_id, datetaken, fstop, iso, model, lens FROM photos WHERE gallery_id = ?")
+	sqlSELECTphotos, err = db.Prepare("SELECT ref, photo_id, gallery_id, datetaken, fstop, iso, model, lens FROM photos WHERE gallery_id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer sqlSELECTphotos.Close()
 
-	sqlSELECTgals, err := db.Prepare("SELECT gallery_id, thumb, description, uploaded FROM galleries WHERE owner_id = ?")
+	sqlSELECTgals, err = db.Prepare("SELECT owner_id, gallery_id, thumb, description, uploaded FROM galleries WHERE owner_id = ?")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -182,7 +189,10 @@ func main() {
 
 	rout.GET("/", func(c *gin.Context) {
 		myUser, _ := c.Get("myUser")
-		c.HTML(http.StatusOK, "index.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "myUser": myUser})
+		gals := getFeedPosts(myUser.(User).Id)
+		avatars := getFollowedAvatars(myUser.(User).Id)
+
+		c.HTML(http.StatusOK, "index2.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "myUser": myUser, "Gals": gals, "Avatars": avatars})
 	})
 
 	rout.GET("/register", func(c *gin.Context) {
@@ -457,17 +467,7 @@ func main() {
 			}
 		}
 
-		rows, err := sqlSELECTgals.Query(user.Id)
-		defer rows.Close()
-		gals := make([]Gallery, 0)
-		for rows.Next() {
-			var gallery Gallery
-			if err := rows.Scan(&gallery.Id, &gallery.Thumb, &gallery.Description, &gallery.Uploaded); err != nil {
-				panic(err)
-			}
-			PopulateGallery(sqlSELECTphotos, &gallery)
-			gals = append(gals, gallery)
-		}
+		gals := getGalleries(user.Id)
 		bytes, err := json.Marshal(gals)
 		if err != nil {
 			panic(err)
@@ -480,7 +480,7 @@ func main() {
 			IsUsersProfile = true
 		} else {
 			IsUsersProfile = false
-			followedBySessionUser := getFollowedBy(db, myUser.(User).Id)
+			followedBySessionUser := getFollowedBy(myUser.(User).Id)
 			if _, exists := followedBySessionUser[user.Id]; exists {
 				log.Println("Follows")
 				sessionUserFollowsRequestedUser = true
@@ -625,7 +625,7 @@ func main() {
 		}
 		myId := myUserI.(User).Id
 
-		follows := getFollowedBy(db, myId)
+		follows := getFollowedBy(myId)
 		if _, exists := follows[theirId]; exists { //if user already follows this user
 			log.Println("Skipping redundant follow action")
 			return
@@ -666,7 +666,7 @@ func main() {
 	rout.Run()
 }
 
-func getFollowedBy(db *sql.DB, user_id int) map[int]struct{} {
+func getFollowedBy(user_id int) map[int]struct{} {
 	rows, err := db.Query("SELECT followed FROM follows WHERE follower = ?", user_id)
 	if err != nil {
 		log.Println("Error getting followed users", err.Error())
@@ -681,6 +681,24 @@ func getFollowedBy(db *sql.DB, user_id int) map[int]struct{} {
 		ids[id] = struct{}{}
 	}
 	return ids
+}
+
+func getGalleries(owner_id int) []Gallery {
+	rows, err := sqlSELECTgals.Query(owner_id)
+	defer rows.Close()
+	if err != nil {
+		panic(err)
+	}
+	gals := make([]Gallery, 0)
+	for rows.Next() {
+		var gallery Gallery
+		if err := rows.Scan(&gallery.Owner, &gallery.Id, &gallery.Thumb, &gallery.Description, &gallery.Uploaded); err != nil {
+			panic(err)
+		}
+		PopulateGallery(sqlSELECTphotos, &gallery)
+		gals = append(gals, gallery)
+	}
+	return gals
 }
 
 func loadTemplates(dir string) multitemplate.Renderer {
@@ -703,4 +721,39 @@ func loadTemplates(dir string) multitemplate.Renderer {
 		r.AddFromFiles(filepath.Base(include), files...)
 	}
 	return r
+}
+
+func getFeedPosts(id int) string {
+	followed := getFollowedBy(id)
+	all_galleries := make([]Gallery, 0)
+	for key := range followed {
+		gals := getGalleries(key)
+		all_galleries = append(all_galleries, gals...) //`gals...` appends every item of gals to all_galleries
+	}
+	bytes, err := json.Marshal(all_galleries)
+	if err != nil {
+		panic(err)
+	}
+	jsonGals := string(bytes[:])
+	return jsonGals
+}
+
+func getFollowedAvatars(id int) string {
+	followed := getFollowedBy(id)
+	maps := make(map[string]string) //username maps to avatar path
+	for key := range followed {
+		var user User
+		sqlSELECTuserID.QueryRow(key).Scan(&user.Id, &user.Username, &user.Displayname, &user.Avatar, &user.Bio)
+		if user.Avatar == "" {
+			user.Avatar = DEFAULT_AVATAR
+		} else {
+			user.Avatar = StorageZoneRead + user.Avatar
+		}
+		maps[user.Username] = user.Avatar
+	}
+	bytes, err := json.Marshal(maps)
+	if err != nil {
+		panic(err)
+	}
+	return string(bytes[:])
 }
