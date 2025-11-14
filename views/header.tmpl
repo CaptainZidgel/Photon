@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<body>
+{{define "header"}}
 <div id="header">
 	{{if .myUser}}
 	<span id="self-ref">Hi, <a href="/p/{{.myUser.Username}}">{{.myUser.Username}}</a>!</span><br>
@@ -21,8 +20,8 @@ License: MY-LICENSE</textarea><br>
 	<span id="logio"><a href="/login">Login</a></span>
 	{{end}}
 </div>
-<script>
 {{if .myUser}}
+<script>
 let uc = document.getElementById("UPLOAD-CONTAINER");
 function toggleUpload() {
 	uc.showModal();
@@ -50,11 +49,9 @@ uploadForm.addEventListener("submit", (e) => {
 	uploadReq(uploadForm);
 	uc.close();
 })
-{{end}}
 </script>
+{{end}}
 {{if .Error}}<p class="err">{{.Error}}</p>{{end}}
-{{template "content" . }}
-</body>
 <style>
 @font-face: {
 	font-family: "Liberation";
@@ -91,4 +88,4 @@ a {
 	color: red;
 }
 </style>
-</html>
+{{end}}

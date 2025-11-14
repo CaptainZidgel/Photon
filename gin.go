@@ -4,10 +4,8 @@ import (
 	_ "bufio"
 	"bytes"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-contrib/multitemplate"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -22,7 +20,6 @@ import (
 	_ "mime/multipart"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -80,7 +77,7 @@ var sqlSELECTgals *sql.Stmt
 var sqlSELECTphotos *sql.Stmt
 var sqlSELECTuserID *sql.Stmt
 
-const DEFAULT_AVATAR string = "TBD";
+const DEFAULT_AVATAR string = "TBD"
 
 func main() {
 	pcost, _ := strconv.Atoi(os.Getenv("PHOTON_PASSWORD_COST"))
@@ -179,8 +176,7 @@ func main() {
 	/*																																																		*/
 
 	rout := gin.Default()
-	//rout.LoadHTMLGlob("views/*")
-	rout.HTMLRender = loadTemplates("./views")
+	rout.LoadHTMLGlob("./views/*")
 
 	store := cookie.NewStore([]byte(Config.CSecret))
 	rout.Use(sessions.Sessions("session", store))
@@ -192,7 +188,7 @@ func main() {
 		gals := getFeedPosts(myUser.(User).Id)
 		avatars := getFollowedAvatars(myUser.(User).Id)
 
-		c.HTML(http.StatusOK, "index2.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "myUser": myUser, "Gals": gals, "Avatars": avatars})
+		c.HTML(http.StatusOK, "index.tmpl", gin.H{"Nums": []int{1, 2, 3, 5}, "myUser": myUser, "Gals": gals, "Avatars": avatars})
 	})
 
 	rout.GET("/register", func(c *gin.Context) {
@@ -468,11 +464,6 @@ func main() {
 		}
 
 		gals := getGalleries(user.Id)
-		bytes, err := json.Marshal(gals)
-		if err != nil {
-			panic(err)
-		}
-		jsonGals := string(bytes[:])
 
 		var IsUsersProfile bool
 		var sessionUserFollowsRequestedUser bool
@@ -488,12 +479,11 @@ func main() {
 		}
 		fmt.Println("Same user:", IsUsersProfile)
 		c.HTML(200, "profile.tmpl", gin.H{
-			"User": user,
+			"User":      user,
 			"Galleries": gals,
-			"myUser": myUser,
-			"SameUser": IsUsersProfile,
-			"jsonGals": jsonGals,
-			"follows": sessionUserFollowsRequestedUser,
+			"myUser":    myUser,
+			"SameUser":  IsUsersProfile,
+			"follows":   sessionUserFollowsRequestedUser,
 		})
 	})
 
@@ -701,44 +691,17 @@ func getGalleries(owner_id int) []Gallery {
 	return gals
 }
 
-func loadTemplates(dir string) multitemplate.Renderer {
-	r := multitemplate.NewRenderer()
-
-	layouts, err := filepath.Glob(dir + "/layouts/*") //Glob returns the names of all files matching pattern
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	includes, err := filepath.Glob(dir + "/templates/*")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, include := range includes {
-		layoutCopy := make([]string, len(layouts))
-		copy(layoutCopy, layouts)
-		files := append(layoutCopy, include)
-		r.AddFromFiles(filepath.Base(include), files...)
-	}
-	return r
-}
-
-func getFeedPosts(id int) string {
+func getFeedPosts(id int) []Gallery {
 	followed := getFollowedBy(id)
 	all_galleries := make([]Gallery, 0)
 	for key := range followed {
 		gals := getGalleries(key)
 		all_galleries = append(all_galleries, gals...) //`gals...` appends every item of gals to all_galleries
 	}
-	bytes, err := json.Marshal(all_galleries)
-	if err != nil {
-		panic(err)
-	}
-	jsonGals := string(bytes[:])
-	return jsonGals
+	return all_galleries
 }
 
-func getFollowedAvatars(id int) string {
+func getFollowedAvatars(id int) map[string]string {
 	followed := getFollowedBy(id)
 	maps := make(map[string]string) //username maps to avatar path
 	for key := range followed {
@@ -751,9 +714,5 @@ func getFollowedAvatars(id int) string {
 		}
 		maps[user.Username] = user.Avatar
 	}
-	bytes, err := json.Marshal(maps)
-	if err != nil {
-		panic(err)
-	}
-	return string(bytes[:])
+	return maps
 }

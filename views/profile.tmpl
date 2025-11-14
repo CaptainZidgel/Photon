@@ -1,11 +1,11 @@
 <!--Sneaky HTML comment to persuade my text editor to highlight as HTML-->
-{{define "content"}}
 {{$SU := .SameUser}}
 <head>
 <script src=" https://cdn.jsdelivr.net/npm/macy@2.5.1/dist/macy.min.js "></script>
 <title>{{.User.Username}}</title>
 </head>
 <body>
+{{template "header" .}} <!-- `template "file" .` passes context from gin (ie .myUser, .SameUser, etc) to the embedded subtemplate. as opposed to `template "file"` which does not -->
 <div id="body">
 	{{if $SU}}
 	<dialog id="pfp-form-container">
@@ -236,7 +236,7 @@ tr:nth-child(even) {
 }
 </style>
 <script type="text/javascript" defer>
-let gals = JSON.parse({{.jsonGals}});
+let gals = {{.Galleries}};
 
 let thumbsBox = document.getElementById("macy-container");
 let lightbox = document.getElementById("lbox");
@@ -502,4 +502,3 @@ userInfo.appendChild(followBtn);
 		})
 	}
 </script>
-{{end}}

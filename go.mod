@@ -4,7 +4,6 @@ go 1.25.3
 
 require (
 	github.com/dsoprea/go-exif/v3 v3.0.1
-	github.com/gin-contrib/multitemplate v1.1.1
 	github.com/gin-contrib/sessions v1.0.4
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-sql-driver/mysql v1.9.3
